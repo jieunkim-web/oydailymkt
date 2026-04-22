@@ -525,17 +525,17 @@ async function loadAllData() {
 
   try {
     setStatus('Meta 데이터 로딩 중...', 'loading');
-    const metaRows = await fetchSheet('[Q]메타');
+    const metaRows = await fetchSheet('메타');
     allData.meta = metaRows;
 
     setStatus('카카오 데이터 로딩 중...', 'loading');
-    try { allData.kakao = await fetchSheet('[Q]카카오'); } catch(e) { allData.kakao = []; }
+    try { allData.kakao = await fetchSheet('카카오'); } catch(e) { allData.kakao = []; }
 
     setStatus('구글애즈 데이터 로딩 중...', 'loading');
-    try { allData.google = await fetchSheet('[Q]구글애즈'); } catch(e) { allData.google = []; }
+    try { allData.google = await fetchSheet('구글'); } catch(e) { allData.google = []; }
 
     setStatus('올리브영 매출 로딩 중...', 'loading');
-    try { allData.oy = await fetchSheet('[Q]OY온라인'); } catch(e) { allData.oy = []; }
+    try { allData.oy = await fetchSheet('OY온라인'); } catch(e) { allData.oy = []; }
 
     renderAll();
     const now = new Date().toLocaleString('ko-KR');
