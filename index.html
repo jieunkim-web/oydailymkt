@@ -368,10 +368,17 @@ async function loadAllData(){
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    const oyValid=allData.oy.filter(r=>r.date&&r.date!=='#N/A'&&/\d/.test(r.date));
-    const oySample=oyValid.slice(-3).map(r=>`date=${r.date}`).join(' | ');
-    setStatus(`완료 — Meta ${allData.meta.length}행 · OY ${allData.oy.length}행 · 날짜범위: ${filterFrom}~${filterTo} · OY마지막샘플: ${oySample}`,'success');
-    setTimeout(hideStatus,4000);
+    // OY 전체 컬럼명 + 다양한 행 샘플
+    const oyKeys=allData.oy.length?Object.keys(allData.oy[0]).join(','):'';
+    const oyMid=allData.oy[Math.floor(allData.oy.length/2)];
+    const oyLast=allData.oy[allData.oy.length-1];
+    const oySample=`컬럼:${oyKeys} | 중간행:${JSON.stringify(oyMid)} | 마지막행:${JSON.stringify(oyLast)}`;
+    // OY date 컬럼 값 직접 확인
+    const oyDateSamples = allData.oy.slice(0,5).map(r=>r.date||'없음').join(' / ');
+    const oyTotal = allData.oy.length;
+    const oyFiltered = allData.oy.filter(r=>r.date&&r.date>='2026-01-01').length;
+    setStatus(`완료 — Meta ${allData.meta.length}행 · OY ${oyTotal}행(26년:${oyFiltered}행) · 날짜범위:${filterFrom}~${filterTo} · OY첫5행date: ${oyDateSamples}`,'success');
+    // setTimeout(hideStatus,4000); // 디버그 중 숨김 비활성화
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
