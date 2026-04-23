@@ -344,7 +344,21 @@ async function loadAllData(){
     setStatus('구글 로딩...','loading');
     try{allData.google=await fetchSheet('구글',1);}catch(e){allData.google=[];}
     setStatus('올리브영 매출 로딩...','loading');
-    try{allData.oy=await fetchSheet('OY온라인',2);}catch(e){allData.oy=[];}
+    try{
+      const oyGid='164965270';
+      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=${oyGid}`;
+      const oyResp=await fetch(oyUrl);
+      const oyRawText=await oyResp.text();
+      const oyRawLines=oyRawText.trim().split('\n');
+      // actual_revenue 포함된 줄을 헤더로 자동 감지
+      let oyHdrIdx=1; // 기본 2행(0-indexed:1)
+      for(let i=0;i<Math.min(6,oyRawLines.length);i++){
+        if(oyRawLines[i].toLowerCase().replace(/[^a-z_]/g,'').includes('actual_revenue')){
+          oyHdrIdx=i; break;
+        }
+      }
+      allData.oy=parseCSV(oyRawText, oyHdrIdx+1);
+    }catch(e){allData.oy=[];console.error('OY오류:',e);}
 
     const dates=getAllDates();
     if(dates.length){filterTo=dates[dates.length-1];filterFrom=dates[Math.max(0,dates.length-7)];}
@@ -360,8 +374,9 @@ async function loadAllData(){
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
     const oyValid26=allData.oy.filter(r=>normalizeDate(r.partition_date||'')>='2026-01-01').length;
-    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행(26년:${oyValid26}행) · 날짜범위: ${filterFrom}~${filterTo}`,'success');
-    setTimeout(hideStatus,5000);
+    const oyFirstDate=allData.oy.length?allData.oy[0].partition_date:'없음';
+    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행(26년:${oyValid26}행) · OY첫날짜:${oyFirstDate} · 날짜범위: ${filterFrom}~${filterTo}`,'success');
+    setTimeout(hideStatus,6000);
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
