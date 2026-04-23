@@ -367,7 +367,8 @@ async function loadAllData(){
 // KPI
 function renderKPI(){
   const latest=getLatestDate();if(!latest)return;
-  let ydM=allData.meta.filter(r=>r.partition_date===latest);
+  // partition_date를 정규화해서 비교
+  let ydM=allData.meta.filter(r=>normalizeDate(r.partition_date||'')===latest);
   if(selectedProduct!=='all')ydM=ydM.filter(r=>r.product_name===selectedProduct);
   let p7M=getPrev7(allData.meta);
   const p7Days=new Set(p7M.map(r=>r.partition_date)).size||1;
