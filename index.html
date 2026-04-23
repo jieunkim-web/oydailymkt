@@ -240,7 +240,7 @@ function parseCSV(text,hRow){
     const obj={};
     headers.forEach((h,i)=>{obj[h]=(cells[i]||'').replace(/"/g,'').trim();});
     return obj;
-  }).filter(r=>Object.values(r).some(v=>v));
+  }).filter(r=>Object.values(r).some(v=>v&&v!=='#N/A'&&v!=='#REF!'&&v!=='#VALUE!'&&v!=='#ERROR!'));
 }
 function splitLine(line){
   const r=[];let c='',q=false;
@@ -276,7 +276,9 @@ function getLatestDate(){return filterTo;}
 function filterRows(rows,dateKey){
   dateKey=dateKey||'partition_date';
   let out=rows.filter(r=>{
-    const d=normalizeDate(r[dateKey]||'');
+    const raw=r[dateKey]||'';
+    if(!raw||raw==='#N/A'||raw==='#REF!'||raw==='#VALUE!')return false;
+    const d=normalizeDate(raw);
     return d>=filterFrom&&d<=filterTo;
   });
   if(selectedProduct!=='all')out=out.filter(r=>(r.product_name||'')===selectedProduct);
@@ -366,7 +368,8 @@ async function loadAllData(){
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    const oySample=allData.oy.slice(-3).map(r=>`date=${r.date||r['date']||Object.values(r)[3]}`).join(' | ');
+    const oyValid=allData.oy.filter(r=>r.date&&r.date!=='#N/A'&&/\d/.test(r.date));
+    const oySample=oyValid.slice(-3).map(r=>`date=${r.date}`).join(' | ');
     setStatus(`완료 — Meta ${allData.meta.length}행 · OY ${allData.oy.length}행 · 날짜범위: ${filterFrom}~${filterTo} · OY마지막샘플: ${oySample}`,'success');
     setTimeout(hideStatus,4000);
   }catch(e){setStatus('오류: '+e.message,'error');}
@@ -491,8 +494,9 @@ function renderCampTable(tab){
   let rows=allData[tab];
   if(selectedProduct!=='all')rows=rows.filter(r=>r.product_name===selectedProduct);
   if(!rows.length){setEmpty(8,'데이터 없음');return;}
+  const allDatesInRows=[...new Set(rows.map(r=>normalizeDate(r.partition_date||'')).filter(Boolean))].sort();
   const ydRows=rows.filter(r=>normalizeDate(r.partition_date||'')===latest);
-  if(!ydRows.length){setEmpty(8,latest+' 날짜 데이터 없음');return;}
+  if(!ydRows.length){setEmpty(8,`${latest} 날짜 없음 (시트내 날짜: ${allDatesInRows.slice(-3).join(', ')})`);return;}
   const camps={};
   ydRows.forEach(r=>{
     const k=r.campaign_name||'(없음)';
