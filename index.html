@@ -222,7 +222,7 @@ function hideStatus(){document.getElementById('status-bar').classList.remove('sh
 
 // CSV 파싱 — headerRow: 몇 번째 줄이 헤더인지 (1-indexed)
 async function fetchSheet(name,headerRow){
-  const gidMap={'메타':'724559574','카카오':'426543347','구글':'1538188926','OY온라인':'0'};
+  const gidMap={'메타':'724559574','카카오':'426543347','구글':'1538188926','OY온라인':'164965270'};
   const gid=gidMap[name];
   const url=gid!==undefined
     ? `https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=${gid}`
@@ -347,7 +347,7 @@ async function loadAllData(){
     setStatus('올리브영 매출 로딩...','loading');
     try{
       // 원본 CSV 받아서 헤더 행 동적 감지
-      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=0`;
+      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=164965270`;
       const oyResp=await fetch(oyUrl);
       const oyText=await oyResp.text();
       const oyLines=oyText.trim().split('\n');
