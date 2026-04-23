@@ -346,18 +346,26 @@ async function loadAllData(){
     setStatus('올리브영 매출 로딩...','loading');
     try{
       const oyGid='164965270';
-      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=${oyGid}`;
+      // JSON 방식으로 변경 — CSV 인코딩/파싱 문제 회피
+      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:json&gid=${oyGid}`;
       const oyResp=await fetch(oyUrl);
-      const oyRawText=await oyResp.text();
-      const oyRawLines=oyRawText.trim().split('\n');
-      // actual_revenue 포함된 줄을 헤더로 자동 감지
-      let oyHdrIdx=1; // 기본 2행(0-indexed:1)
-      for(let i=0;i<Math.min(6,oyRawLines.length);i++){
-        if(oyRawLines[i].toLowerCase().replace(/[^a-z_]/g,'').includes('actual_revenue')){
-          oyHdrIdx=i; break;
-        }
-      }
-      allData.oy=parseCSV(oyRawText, oyHdrIdx+1);
+      const oyText=await oyResp.text();
+      // gviz JSON은 앞에 쓸모없는 텍스트가 붙어서 제거
+      const oyJson=JSON.parse(oyText.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
+      const oyCols=oyJson.table.cols;
+      const oyRows=oyJson.table.rows;
+      // 2행 헤더: cols에서 컬럼명 가져오기 (label 우선, id 차선)
+      // actual_revenue, yearmonth, product_name, partition_date, 라인, (빈칸), Day, 판매량
+      const oyHeaders=['actual_revenue','yearmonth','product_name','partition_date','라인','','day','판매량'];
+      allData.oy=oyRows.map(row=>{
+        const obj={};
+        oyHeaders.forEach((h,i)=>{
+          if(!h)return;
+          const cell=row.c&&row.c[i];
+          obj[h]=cell&&cell.v!==null&&cell.v!==undefined?String(cell.v):'';
+        });
+        return obj;
+      }).filter(r=>r.actual_revenue&&r.partition_date&&r.partition_date!='null');
     }catch(e){allData.oy=[];console.error('OY오류:',e);}
 
     const dates=getAllDates();
@@ -373,10 +381,10 @@ async function loadAllData(){
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    const oyValid26=allData.oy.filter(r=>normalizeDate(r.partition_date||'')>='2026-01-01').length;
-    const oyFirstDate=allData.oy.length?allData.oy[0].partition_date:'없음';
-    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행(26년:${oyValid26}행) · OY첫날짜:${oyFirstDate} · 날짜범위: ${filterFrom}~${filterTo}`,'success');
-    setTimeout(hideStatus,6000);
+    // OY partition_date 원시값 샘플 — 정규화 전 raw 값
+    const oyRawDates=allData.oy.slice(0,5).map(r=>`[${r.partition_date}]`).join(' ');
+    const oyApril=allData.oy.filter(r=>{const d=r.partition_date||'';return d.includes('2026-04')||d.includes('2026/04')||d.includes('04/2026');}).length;
+    setStatus(`OY raw날짜샘플: ${oyRawDates} | 4월포함행: ${oyApril} | Meta범위: ${filterFrom}~${filterTo}`,'success');
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
