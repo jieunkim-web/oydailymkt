@@ -374,10 +374,9 @@ async function loadAllData(){
     const oyLast=allData.oy[allData.oy.length-1];
     const oySample=`컬럼:${oyKeys} | 중간행:${JSON.stringify(oyMid)} | 마지막행:${JSON.stringify(oyLast)}`;
     // OY date 컬럼 값 직접 확인
-    const oyFirst = allData.oy[0]||{};
-    const oyColNames = Object.keys(oyFirst).join(' | ');
-    const oyFirstRow = JSON.stringify(oyFirst).slice(0,200);
-    setStatus(`OY컬럼명: ${oyColNames} /// 첫행: ${oyFirstRow}`,'success');
+    const oyValid26 = allData.oy.filter(r=>normalizeDate(r.partition_date||'')>='2026-01-01').length;
+    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행(26년:${oyValid26}행) · 날짜범위: ${filterFrom}~${filterTo}`,'success');
+    setTimeout(hideStatus,5000);
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
@@ -408,15 +407,15 @@ function renderKPI(){
   const p7Ctr=p7Impr>0?p7Clk/p7Impr*100:0;
 
   // OY — OY 내 가장 최신 날짜 기준 (Meta와 연도 다를 수 있음)
-  const oyDates=[...new Set(allData.oy.map(r=>r.date||'').filter(d=>d))].sort();
+  const oyDates=[...new Set(allData.oy.map(r=>r.partition_date||'').filter(d=>d))].sort();
   const oyLatest=oyDates[oyDates.length-1]||'';
-  let ydOY=allData.oy.filter(r=>normalizeDate(r.date||'')===oyLatest);
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===oyLatest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
   const oyPrev7=oyDates.slice(Math.max(0,oyDates.length-8),-1);
-  let p7OY=allData.oy.filter(r=>oyPrev7.includes(normalizeDate(r.date||'')));
+  let p7OY=allData.oy.filter(r=>oyPrev7.includes(normalizeDate(r.partition_date||'')));
   if(selectedProduct!=='all')p7OY=p7OY.filter(r=>r.product_name===selectedProduct);
-  const p7OYDays=new Set(p7OY.map(r=>r.date)).size||1;
+  const p7OYDays=new Set(p7OY.map(r=>r.partition_date)).size||1;
   const p7Rev=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
 
   const ydRatio=ydRev>0?ydSpend/ydRev*100:0;
@@ -456,7 +455,7 @@ function renderTrendChart(){
   fM.forEach(r=>{if(mD[r.partition_date]!==undefined)mD[r.partition_date]+=cleanNum(r.spend);});
   fK.forEach(r=>{if(kD[r.partition_date]!==undefined)kD[r.partition_date]+=cleanNum(r.spend);});
   fG.forEach(r=>{if(gD[r.partition_date]!==undefined)gD[r.partition_date]+=cleanNum(r.spend);});
-  fOY.forEach(r=>{const d=r.date||'';if(d&&oyD[d]!==undefined)oyD[d]+=cleanNum(r.actual_revenue);});
+  fOY.forEach(r=>{const d=r.partition_date||'';if(d&&oyD[d]!==undefined)oyD[d]+=cleanNum(r.actual_revenue);});
   document.getElementById('trend-sub').textContent=filterFrom+' ~ '+filterTo+(selectedProduct!=='all'?' · '+selectedProduct:'');
   const ctx=document.getElementById('trend-chart').getContext('2d');
   if(trendChart)trendChart.destroy();
@@ -522,7 +521,7 @@ function renderCampTable(tab){
 function renderProductTable(){
   document.getElementById('camp-date-lbl').textContent='(선택 기간 기준)';
   document.getElementById('main-thead').innerHTML='<tr><th>제품명</th><th>OY 매출</th><th>판매량</th><th>Meta 광고비</th><th>ROAS 7d</th><th>구매 7d</th><th>광고비/매출</th></tr>';
-  const fOY=filterRows(allData.oy,'date'),fM=filterRows(allData.meta);
+  const fOY=filterRows(allData.oy,'partition_date'),fM=filterRows(allData.meta);
   const prods={};
   fOY.forEach(r=>{const k=r.product_name||'(없음)';if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p7d:0,v7d:0};prods[k].rev+=cleanNum(r.actual_revenue);prods[k].qty+=cleanNum(r['판매량']||0);});
   fM.forEach(r=>{const k=r.product_name||'';if(k&&prods[k]){prods[k].spend+=cleanNum(r.spend);prods[k].p7d+=cleanNum(r.purchases_7d_click||0);prods[k].v7d+=cleanNum(r.purchase_value_7d_click||0);}});
@@ -550,7 +549,7 @@ function runAI(){
   const p7Spend=p7M.reduce((s,r)=>s+cleanNum(r.spend),0)/p7Days;
   const p7V7d=p7M.reduce((s,r)=>s+cleanNum(r.purchase_value_7d_click),0)/p7Days;
 
-  let ydOY=allData.oy.filter(r=>normalizeDate(r.date||'')===latest);
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===latest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const oyRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
 
