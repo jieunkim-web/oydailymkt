@@ -341,9 +341,17 @@ async function loadAllData(){
     try{allData.kakao=await fetchSheet('카카오',1);}catch(e){allData.kakao=[];}
     setStatus('구글 로딩...','loading');
     try{allData.google=await fetchSheet('구글',1);}catch(e){allData.google=[];}
-    // OY: 1행=대제목, 2행=헤더
+    // OY: 1행=대제목, 2행=헤더 (병합셀 풀리면 3행일 수도 있어서 동적 감지)
     setStatus('올리브영 매출 로딩...','loading');
-    try{allData.oy=await fetchSheet('OY온라인',2);}catch(e){allData.oy=[];}
+    try{
+      // 2행 헤더로 먼저 시도
+      let oyData=await fetchSheet('OY온라인',2);
+      // actual_revenue 컬럼이 없으면 3행 헤더로 재시도
+      if(!oyData.length||!oyData[0].hasOwnProperty('actual_revenue')){
+        oyData=await fetchSheet('OY온라인',3);
+      }
+      allData.oy=oyData;
+    }catch(e){allData.oy=[];}
 
     const dates=getAllDates();
     if(dates.length){filterTo=dates[dates.length-1];filterFrom=dates[Math.max(0,dates.length-7)];}
@@ -358,7 +366,8 @@ async function loadAllData(){
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행 · 날짜범위: ${filterFrom}~${filterTo}`,'success');
+    const oySample=allData.oy.slice(-3).map(r=>`date=${r.date||r['date']||Object.values(r)[3]}`).join(' | ');
+    setStatus(`완료 — Meta ${allData.meta.length}행 · OY ${allData.oy.length}행 · 날짜범위: ${filterFrom}~${filterTo} · OY마지막샘플: ${oySample}`,'success');
     setTimeout(hideStatus,4000);
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
@@ -392,11 +401,11 @@ function renderKPI(){
   // OY — OY 내 가장 최신 날짜 기준 (Meta와 연도 다를 수 있음)
   const oyDates=[...new Set(allData.oy.map(r=>r.date||'').filter(d=>d))].sort();
   const oyLatest=oyDates[oyDates.length-1]||'';
-  let ydOY=allData.oy.filter(r=>(r.date||'')===oyLatest);
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.date||'')===oyLatest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
   const oyPrev7=oyDates.slice(Math.max(0,oyDates.length-8),-1);
-  let p7OY=allData.oy.filter(r=>oyPrev7.includes(r.date||''));
+  let p7OY=allData.oy.filter(r=>oyPrev7.includes(normalizeDate(r.date||'')));
   if(selectedProduct!=='all')p7OY=p7OY.filter(r=>r.product_name===selectedProduct);
   const p7OYDays=new Set(p7OY.map(r=>r.date)).size||1;
   const p7Rev=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
@@ -482,7 +491,7 @@ function renderCampTable(tab){
   let rows=allData[tab];
   if(selectedProduct!=='all')rows=rows.filter(r=>r.product_name===selectedProduct);
   if(!rows.length){setEmpty(8,'데이터 없음');return;}
-  const ydRows=rows.filter(r=>r.partition_date===latest);
+  const ydRows=rows.filter(r=>normalizeDate(r.partition_date||'')===latest);
   if(!ydRows.length){setEmpty(8,latest+' 날짜 데이터 없음');return;}
   const camps={};
   ydRows.forEach(r=>{
@@ -531,7 +540,7 @@ function runAI(){
   const p7Spend=p7M.reduce((s,r)=>s+cleanNum(r.spend),0)/p7Days;
   const p7V7d=p7M.reduce((s,r)=>s+cleanNum(r.purchase_value_7d_click),0)/p7Days;
 
-  let ydOY=allData.oy.filter(r=>(r.date||'')===latest);
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.date||'')===latest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const oyRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
 
