@@ -160,7 +160,7 @@ tr:hover td{background:rgba(108,99,255,0.04);}
 
 <div class="kpi-grid">
   <div class="kpi-card" style="--accent-color:#6c63ff"><div class="kpi-label">총 광고비 (전일)</div><div class="kpi-value" id="kpi-spend">—</div><div class="kpi-compare" id="kpi-spend-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#43e97b"><div class="kpi-label">OY 매출 (전일)</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-compare" id="kpi-revenue-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#43e97b"><div class="kpi-label" id="oy-kpi-label">OY 매출 (최신일)</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-compare" id="kpi-revenue-cmp"></div></div>
   <div class="kpi-card" style="--accent-color:#f7971e"><div class="kpi-label">ROAS 7d (전일)</div><div class="kpi-value" id="kpi-roas">—</div><div class="kpi-compare" id="kpi-roas-cmp"></div></div>
   <div class="kpi-card" style="--accent-color:#ff6584"><div class="kpi-label">구매수 7d (전일)</div><div class="kpi-value" id="kpi-purchases">—</div><div class="kpi-compare" id="kpi-purchases-cmp"></div></div>
   <div class="kpi-card" style="--accent-color:#00c6ff"><div class="kpi-label">CTR 평균 (전일)</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-compare" id="kpi-ctr-cmp"></div></div>
@@ -248,31 +248,48 @@ function splitLine(line){
   r.push(c);return r;
 }
 
-// 날짜
+// 날짜 — 어떤 형식이든 YYYY-MM-DD로 정규화
+function normalizeDate(d){
+  if(!d)return'';
+  d=String(d).trim();
+  // 이미 YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+  // YYYY/MM/DD
+  if(/^\d{4}\/\d{2}\/\d{2}$/.test(d))return d.replace(/\//g,'-');
+  // 구글 시트 직렬 숫자 (예: 45000대)
+  if(/^\d{5}$/.test(d)){
+    const base=new Date(1899,11,30);
+    base.setDate(base.getDate()+parseInt(d));
+    return base.toISOString().slice(0,10);
+  }
+  // Date 파싱 시도
+  try{const p=new Date(d);if(!isNaN(p))return p.toISOString().slice(0,10);}catch(e){}
+  return d;
+}
 function getAllDates(){
-  const s=new Set([...allData.meta,...allData.kakao,...allData.google].map(r=>r.partition_date||'').filter(d=>/\d{4}-\d{2}-\d{2}/.test(d)));
+  const s=new Set([...allData.meta,...allData.kakao,...allData.google]
+    .map(r=>normalizeDate(r.partition_date||''))
+    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)));
   return[...s].sort();
 }
 function getLatestDate(){return filterTo;}
 function filterRows(rows,dateKey){
   dateKey=dateKey||'partition_date';
-  let out=rows.filter(r=>{const d=r[dateKey]||'';return d>=filterFrom&&d<=filterTo;});
-  // 전체제품이면 필터 안함, 특정 제품이면 product_name 일치하는 것만
+  let out=rows.filter(r=>{
+    const d=normalizeDate(r[dateKey]||'');
+    return d>=filterFrom&&d<=filterTo;
+  });
   if(selectedProduct!=='all')out=out.filter(r=>(r.product_name||'')===selectedProduct);
   return out;
 }
 function getPrev7(rows,dateKey){
   dateKey=dateKey||'partition_date';
   const dates=getAllDates();
-  // filterFrom과 정확히 일치 or 그 이전 가장 가까운 인덱스 찾기
   let idx=dates.indexOf(filterFrom);
-  if(idx<0){
-    // filterFrom보다 작은 날짜 중 가장 큰 인덱스
-    idx=dates.filter(d=>d<filterFrom).length;
-  }
+  if(idx<0)idx=dates.filter(d=>d<filterFrom).length;
   if(idx<=0)return[];
   const prev=dates.slice(Math.max(0,idx-7),idx);
-  let out=rows.filter(r=>prev.includes(r[dateKey]||''));
+  let out=rows.filter(r=>prev.includes(normalizeDate(r[dateKey]||'')));
   if(selectedProduct!=='all')out=out.filter(r=>(r.product_name||'')===selectedProduct);
   return out;
 }
@@ -330,11 +347,18 @@ async function loadAllData(){
 
     const dates=getAllDates();
     if(dates.length){filterTo=dates[dates.length-1];filterFrom=dates[Math.max(0,dates.length-7)];}
+    else{
+      // 날짜 못 찾으면 메타 첫 행 샘플 확인
+      const sample=allData.meta.slice(0,1).map(r=>JSON.stringify(r)).join('');
+      setStatus('날짜 인식 실패. 샘플: '+sample,'error');
+      btn.disabled=false;btn.textContent='데이터 불러오기';
+      return;
+    }
     updateDateDisplay();
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행`,'success');
+    setStatus(`완료 — Meta ${allData.meta.length}행 · 카카오 ${allData.kakao.length}행 · 구글 ${allData.google.length}행 · OY ${allData.oy.length}행 · 날짜범위: ${filterFrom}~${filterTo}`,'success');
     setTimeout(hideStatus,4000);
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
@@ -364,11 +388,15 @@ function renderKPI(){
   const p7Roas=p7Spend>0?p7V7d/p7Spend:0;
   const p7Ctr=p7Impr>0?p7Clk/p7Impr*100:0;
 
-  // OY 전일
-  let ydOY=allData.oy.filter(r=>(r.date||'')===latest);
+  // OY — OY 내 가장 최신 날짜 기준 (Meta와 연도 다를 수 있음)
+  const oyDates=[...new Set(allData.oy.map(r=>r.date||'').filter(d=>d))].sort();
+  const oyLatest=oyDates[oyDates.length-1]||'';
+  let ydOY=allData.oy.filter(r=>(r.date||'')===oyLatest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
-  let p7OY=getPrev7(allData.oy,'date');
+  const oyPrev7=oyDates.slice(Math.max(0,oyDates.length-8),-1);
+  let p7OY=allData.oy.filter(r=>oyPrev7.includes(r.date||''));
+  if(selectedProduct!=='all')p7OY=p7OY.filter(r=>r.product_name===selectedProduct);
   const p7OYDays=new Set(p7OY.map(r=>r.date)).size||1;
   const p7Rev=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
 
@@ -382,7 +410,9 @@ function renderKPI(){
   setKPI('kpi-ctr',      ydCtr.toFixed(2)+'%',         ydCtr,  p7Ctr,  '%');
   setKPI('kpi-ratio',    ydRatio>0?ydRatio.toFixed(1)+'%':'—', ydRatio, p7Ratio, '%');
 
-  document.getElementById('filter-summary').textContent=`전일: ${latest}${selectedProduct!=='all'?' · '+selectedProduct:''}`;
+  document.getElementById('filter-summary').textContent=`Meta 전일: ${latest} / OY 최신: ${oyLatest}${selectedProduct!=='all'?' · '+selectedProduct:''}`;
+  const oyLbl=document.getElementById('oy-kpi-label');
+  if(oyLbl)oyLbl.textContent='OY 매출 ('+oyLatest+')';
 }
 
 function setKPI(id,val,cur,p7,unit){
@@ -396,7 +426,10 @@ function setKPI(id,val,cur,p7,unit){
 
 // 추세 차트
 function renderTrendChart(){
-  const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google),fOY=filterRows(allData.oy,'date');
+  const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
+  // OY는 자체 날짜 범위 사용 (Meta와 연도 다를 수 있음)
+  let fOY=allData.oy;
+  if(selectedProduct!=='all')fOY=fOY.filter(r=>r.product_name===selectedProduct);
   const dates=[...new Set([...fM,...fK,...fG].map(r=>r.partition_date||'').filter(d=>d))].sort();
   if(!dates.length)return;
   const mD={},kD={},gD={},oyD={};
@@ -404,7 +437,7 @@ function renderTrendChart(){
   fM.forEach(r=>{if(mD[r.partition_date]!==undefined)mD[r.partition_date]+=cleanNum(r.spend);});
   fK.forEach(r=>{if(kD[r.partition_date]!==undefined)kD[r.partition_date]+=cleanNum(r.spend);});
   fG.forEach(r=>{if(gD[r.partition_date]!==undefined)gD[r.partition_date]+=cleanNum(r.spend);});
-  fOY.forEach(r=>{const d=r.date||'';if(oyD[d]!==undefined)oyD[d]+=cleanNum(r.actual_revenue);});
+  fOY.forEach(r=>{const d=r.date||'';if(d&&oyD[d]!==undefined)oyD[d]+=cleanNum(r.actual_revenue);});
   document.getElementById('trend-sub').textContent=filterFrom+' ~ '+filterTo+(selectedProduct!=='all'?' · '+selectedProduct:'');
   const ctx=document.getElementById('trend-chart').getContext('2d');
   if(trendChart)trendChart.destroy();
