@@ -374,11 +374,10 @@ async function loadAllData(){
     const oyLast=allData.oy[allData.oy.length-1];
     const oySample=`컬럼:${oyKeys} | 중간행:${JSON.stringify(oyMid)} | 마지막행:${JSON.stringify(oyLast)}`;
     // OY date 컬럼 값 직접 확인
-    const oyDateSamples = allData.oy.slice(0,5).map(r=>r.date||'없음').join(' / ');
-    const oyTotal = allData.oy.length;
-    const oyFiltered = allData.oy.filter(r=>r.date&&r.date>='2026-01-01').length;
-    setStatus(`완료 — Meta ${allData.meta.length}행 · OY ${oyTotal}행(26년:${oyFiltered}행) · 날짜범위:${filterFrom}~${filterTo} · OY첫5행date: ${oyDateSamples}`,'success');
-    // setTimeout(hideStatus,4000); // 디버그 중 숨김 비활성화
+    const oyFirst = allData.oy[0]||{};
+    const oyColNames = Object.keys(oyFirst).join(' | ');
+    const oyFirstRow = JSON.stringify(oyFirst).slice(0,200);
+    setStatus(`OY컬럼명: ${oyColNames} /// 첫행: ${oyFirstRow}`,'success');
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
