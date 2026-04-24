@@ -199,19 +199,14 @@ tr:hover td{background:rgba(108,99,255,0.04);}
 </div>
 
 <!-- 목표 달성률 배너 -->
-<div class="goal-banner" id="goal-banner">
+<div class="goal-banner show" id="goal-banner">
   <div class="goal-banner-top">
-    <div class="goal-banner-title">🎯 이번 달 목표 달성률</div>
-    <div class="goal-inputs">
-      <span style="font-size:10px;color:var(--text3)">월 목표 매출</span>
-      <input class="goal-input" id="goal-revenue" type="text" placeholder="예: 2억" oninput="saveGoals();renderGoals()">
-      <span style="font-size:10px;color:var(--text3)">월 목표 광고비</span>
-      <input class="goal-input" id="goal-spend" type="text" placeholder="예: 3000만" oninput="saveGoals();renderGoals()">
-      <span style="font-size:10px;color:var(--text3)">목표 ROAS</span>
-      <input class="goal-input" id="goal-roas" type="text" placeholder="예: 2.5" style="width:80px" oninput="saveGoals();renderGoals()">
-    </div>
+    <div class="goal-banner-title">🎯 월별 목표 달성률</div>
+    <span style="font-size:11px;color:var(--text3)" id="goal-month-label">데이터를 불러오면 해당 월 목표가 표시됩니다</span>
   </div>
-  <div class="goal-grid" id="goal-grid"></div>
+  <div class="goal-grid" id="goal-grid">
+    <div style="font-size:12px;color:var(--text3);padding:8px 0">데이터를 불러오면 달성률이 표시됩니다.</div>
+  </div>
 </div>
 
 <div class="kpi-grid">
@@ -307,7 +302,7 @@ tr:hover td{background:rgba(108,99,255,0.04);}
 </div>
 <script>
 const SHEET_ID=()=>document.getElementById('sheet-id').value.trim();
-let allData={meta:[],kakao:[],google:[],oy:[]};
+let allData={meta:[],kakao:[],google:[],oy:[],goals:[]};
 let currentTab='meta',trendChart,channelChart;
 let filterFrom='',filterTo='',selectedProduct='all';
 
@@ -319,7 +314,7 @@ function hideStatus(){document.getElementById('status-bar').classList.remove('sh
 
 // CSV 파싱 — headerRow: 몇 번째 줄이 헤더인지 (1-indexed)
 async function fetchSheet(name,headerRow){
-  const gidMap={'메타':'724559574','카카오':'426543347','구글':'1538188926','OY온라인':'164965270'};
+  const gidMap={'메타':'724559574','카카오':'426543347','구글':'1538188926','OY온라인':'164965270','목표':'1577536095'};
   const gid=gidMap[name];
   const url=gid!==undefined
     ? `https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=${gid}`
@@ -440,6 +435,18 @@ async function loadAllData(){
     try{allData.kakao=await fetchSheet('카카오',1);}catch(e){allData.kakao=[];}
     setStatus('구글 로딩...','loading');
     try{allData.google=await fetchSheet('구글',1);}catch(e){allData.google=[];}
+    setStatus('목표 로딩...','loading');
+    try{
+      const goalsRaw=await fetchSheet('목표',1);
+      allData.goals=goalsRaw.map(r=>({
+        yearmonth:   String(r.yearmonth||r['yearmonth']||'').trim(),
+        product:     String(r.product_name||r['제품명']||'전체').trim(),
+        goalRevenue: parseFloat(String(r.goal_revenue||r['목표매출']||0).replace(/,/g,''))||0,
+        goalSpend:   parseFloat(String(r.goal_spend||r['목표광고비']||0).replace(/,/g,''))||0,
+        goalRoas:    parseFloat(String(r.goal_roas||r['목표roas']||r['목표ROAS']||0))||0,
+      })).filter(r=>r.yearmonth);
+      console.log('목표 로드:', allData.goals.length, '행', allData.goals.slice(0,2));
+    }catch(e){allData.goals=[];console.log('목표 시트 없음:', e.message);}
     setStatus('올리브영 매출 로딩...','loading');
     try{
       const oyGid='164965270';
@@ -894,70 +901,72 @@ function renderAll(){renderKPI();renderGoals();renderExtraKPI();renderTrendChart
 <!-- NEW FEATURES JS -->
 <script>
 // ── 숫자 파싱 (목표값 입력: "2억", "3000만" 등) ─────────────
-function parseGoalInput(v){
-  if(!v)return 0;
-  const s=String(v).replace(/,/g,'').trim();
-  if(s.includes('억'))return parseFloat(s)*100000000;
-  if(s.includes('천만'))return parseFloat(s)*10000000;
-  if(s.includes('만'))return parseFloat(s)*10000;
-  return parseFloat(s)||0;
+// ── 목표 달성률 렌더 (시트 기반, 월별, 제품별) ───────────────
+function getGoal(yearmonth, product){
+  // 시트에서 해당 월 + 제품 목표 찾기
+  const ym = String(yearmonth);
+  const exact = allData.goals.find(g => g.yearmonth===ym && g.product===(product||'전체'));
+  if(exact) return exact;
+  // 제품 없으면 전체 목표
+  return allData.goals.find(g => g.yearmonth===ym && g.product==='전체') || null;
 }
 
-// ── 목표 저장/로드 ────────────────────────────────────────────
-function saveGoals(){
-  localStorage.setItem('oy_goals',JSON.stringify({
-    revenue:document.getElementById('goal-revenue').value,
-    spend:document.getElementById('goal-spend').value,
-    roas:document.getElementById('goal-roas').value
-  }));
-}
-function loadGoals(){
-  try{
-    const g=JSON.parse(localStorage.getItem('oy_goals')||'{}');
-    if(g.revenue)document.getElementById('goal-revenue').value=g.revenue;
-    if(g.spend)document.getElementById('goal-spend').value=g.spend;
-    if(g.roas)document.getElementById('goal-roas').value=g.roas;
-  }catch(e){}
-}
-
-// ── 목표 달성률 렌더 ─────────────────────────────────────────
 function renderGoals(){
-  if(!allData.meta.length)return;
-  const banner=document.getElementById('goal-banner');
-  banner.classList.add('show');
+  const hasData = allData.meta.length>0 || allData.oy.length>0;
+  if(!hasData){
+    document.getElementById('goal-grid').innerHTML =
+      '<div style="font-size:12px;color:var(--text3);padding:8px 0">데이터를 불러오면 달성률이 표시됩니다.</div>';
+    return;
+  }
 
-  const goalRev=parseGoalInput(document.getElementById('goal-revenue').value);
-  const goalSpend=parseGoalInput(document.getElementById('goal-spend').value);
-  const goalRoas=parseFloat(document.getElementById('goal-roas').value)||0;
+  // filterTo 기준 월 (선택 기간의 마지막 월)
+  const refDate = filterTo || new Date().toISOString().slice(0,10);
+  const refYM   = refDate.slice(0,7).replace('-',''); // "202504"
+  const monthStart = refDate.slice(0,7) + '-01';
+  const monthEnd   = refDate;
+  const daysInMonth = new Date(+refYM.slice(0,4), +refYM.slice(4,6), 0).getDate();
 
-  // 이번 달 데이터 집계
-  const now=new Date();
-  const monthStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
-  const monthEnd=now.toISOString().slice(0,10);
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const daysPassed=now.getDate();
+  // 해당 월 경과 일수 계산
+  const today = new Date().toISOString().slice(0,10);
+  const isCurrentMonth = (refDate.slice(0,7) === today.slice(0,7));
+  const daysPassed = isCurrentMonth
+    ? new Date().getDate()
+    : new Date(+refYM.slice(0,4), +refYM.slice(4,6), 0).getDate(); // 과거 달이면 전체 일수
 
-  const mthAds=[...allData.meta,...allData.kakao,...allData.google]
-    .filter(r=>{const d=normalizeDate(r.partition_date||'');return d>=monthStart&&d<=monthEnd;});
-  const mthOY=allData.oy.filter(r=>{const d=normalizeDate(r.partition_date||'');return d>=monthStart&&d<=monthEnd;});
+  // 현재 제품 필터에 맞는 목표 가져오기
+  const goal = getGoal(refYM, selectedProduct==='all' ? '전체' : selectedProduct);
+  const hasGoal = goal && (goal.goalRevenue||goal.goalSpend||goal.goalRoas);
 
-  const curSpend=mthAds.reduce((s,r)=>s+cleanNum(r.spend),0);
-  const curRev=mthOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
-  const curAdVal=mthAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
-  const curRoas=curSpend>0?curAdVal/curSpend:0;
+  // 해당 월 실적 집계
+  const mthAds = [...allData.meta,...allData.kakao,...allData.google].filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    const ok = d>=monthStart && d<=monthEnd;
+    return ok && (selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
+  const mthOY = allData.oy.filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    const ok = d>=monthStart && d<=monthEnd;
+    return ok && (selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
 
-  // 일평균으로 월말 예측
-  const projRev=daysPassed>0?curRev/daysPassed*daysInMonth:0;
-  const projSpend=daysPassed>0?curSpend/daysPassed*daysInMonth:0;
+  const curSpend  = mthAds.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const curRev    = mthOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const curAdVal  = mthAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+  const curRoas   = curSpend>0 ? curAdVal/curSpend : 0;
 
-  function goalItem(label,cur,goal,proj,unit,isLower){
-    if(!goal)return'';
-    const pct=Math.min(Math.round(cur/goal*100),200);
-    const projPct=Math.min(Math.round(proj/goal*100),200);
-    const good=isLower?(pct<=100):(pct>=80);
-    const color=pct>=100?'#43e97b':pct>=70?'#f7971e':'#ff6584';
-    const fmt=v=>unit==='x'?v.toFixed(2)+'x':fmtWon(v)+(unit==='원'?'원':'');
-    return`<div class="goal-item">
+  // 월말 예측 (일평균 기반)
+  const projRev   = daysPassed>0 ? curRev/daysPassed*daysInMonth : 0;
+  const projSpend = daysPassed>0 ? curSpend/daysPassed*daysInMonth : 0;
+
+  function goalBar(label, cur, goal, proj, unit, isLower){
+    if(!goal) return '';
+    const pct     = Math.min(Math.round(cur/goal*100), 200);
+    const projPct = Math.min(Math.round(proj/goal*100), 200);
+    const color   = isLower
+      ? (pct<=100?'#43e97b':pct<=120?'#f7971e':'#ff6584')
+      : (pct>=100?'#43e97b':pct>=70?'#f7971e':'#ff6584');
+    const fmt = v => unit==='x' ? v.toFixed(2)+'x' : fmtWon(v)+'원';
+    return `<div class="goal-item">
       <div class="goal-item-label">${label}</div>
       <div class="goal-bar-wrap">
         <div class="goal-bar-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div>
@@ -968,24 +977,35 @@ function renderGoals(){
         <span class="goal-pct" style="color:${color}">${pct}%</span>
       </div>
       <div style="font-size:10px;color:var(--text3);margin-top:4px">
-        📈 이 추세면 월말 ${fmt(projRev>0||unit==='x'?proj:projSpend)} 예상 (${projPct}%)
+        📈 이 추세면 월말 ${fmt(unit==='x'?curRoas:isLower?projSpend:projRev)} 예상 (${projPct}%)
+        ${isCurrentMonth?'':`<span style="color:var(--accent);margin-left:4px">${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월</span>`}
       </div>
     </div>`;
   }
 
-  document.getElementById('goal-grid').innerHTML=
-    goalItem('이번달 OY 매출',curRev,goalRev,projRev,'원',false)+
-    goalItem('이번달 광고비',curSpend,goalSpend,projSpend,'원',true)+
-    (goalRoas?`<div class="goal-item">
-      <div class="goal-item-label">ROAS</div>
-      <div class="goal-bar-wrap"><div class="goal-bar-fill" style="width:${Math.min(curRoas/goalRoas*100,100)}%;background:${curRoas>=goalRoas?'#43e97b':curRoas>=goalRoas*0.7?'#f7971e':'#ff6584'}"></div></div>
-      <div class="goal-nums">
-        <span class="goal-current" style="color:${curRoas>=goalRoas?'#43e97b':'#f7971e'}">${curRoas.toFixed(2)}x</span>
-        <span class="goal-target">목표 ${goalRoas}x</span>
-        <span class="goal-pct" style="color:${curRoas>=goalRoas?'#43e97b':'#ff6584'}">${Math.round(curRoas/goalRoas*100)}%</span>
-      </div>
-    </div>`:'');
+  // 월 레이블 업데이트
+  const lbl = document.getElementById('goal-month-label');
+  if(lbl) lbl.textContent = `${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월 기준 · ${selectedProduct==='all'?'전체 제품':selectedProduct} · 목표 시트 연동`;
+
+  // 목표 없으면 안내 메시지
+  if(!hasGoal){
+    document.getElementById('goal-grid').innerHTML =
+      `<div style="font-size:12px;color:var(--text3);padding:8px 0">
+        📋 ${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월 ${selectedProduct==='all'?'전체':selectedProduct} 목표가 없어요.<br>
+        Google Sheets '목표' 탭에 yearmonth=${refYM} 행을 추가해주세요.
+      </div>`;
+    return;
+  }
+
+  document.getElementById('goal-grid').innerHTML =
+    goalBar(`${refYM.slice(4,6)}월 OY 매출 (${selectedProduct==='all'?'전체':selectedProduct})`,
+      curRev, goal.goalRevenue, projRev, '원', false) +
+    goalBar(`${refYM.slice(4,6)}월 광고비`,
+      curSpend, goal.goalSpend, projSpend, '원', true) +
+    (goal.goalRoas ? goalBar(`${refYM.slice(4,6)}월 ROAS`,
+      curRoas, goal.goalRoas, curRoas, 'x', false) : '');
 }
+
 
 // ── 추가 KPI (CAC, 기여마진율 등) ────────────────────────────
 function renderExtraKPI(){
@@ -1004,26 +1024,46 @@ function renderExtraKPI(){
   const totalImpr=allAds.reduce((s,r)=>s+cleanNum(r.impressions||0),0);
   const totalClick=allAds.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0);
 
+  const COGS_RATE = 0.20; // 원가율 20% 고정
   const cac=totalConv>0?totalSpend/totalConv:0;
-  const contribMargin=totalRev>0?(totalRev-totalSpend)/totalRev*100:0;
   const revenuePerImpr=totalImpr>0?totalRev/totalImpr*1000:0;
   const clickToConv=totalClick>0?totalConv/totalClick*100:0;
 
-  function ekpi(label,val,sub,color){
+  // 공헌이익 계산 (원가율 20% 적용)
+  const grossProfit = totalRev * (1 - COGS_RATE);          // 매출총이익 = 매출 × 80%
+  const contribProfit = grossProfit - totalSpend;            // 공헌이익 = 매출총이익 - 광고비
+  const contribMarginRate = totalRev > 0 ? contribProfit / totalRev * 100 : 0; // 공헌이익률
+  // 기존 기여 마진율 (원가 미반영 버전)
+  const adOnlyMargin = totalRev > 0 ? (totalRev - totalSpend) / totalRev * 100 : 0;
+
+  function ekpi(label,val,sub,color,extra){
     return`<div class="kpi-card" style="--accent-color:${color}">
       <div class="kpi-label">${label}</div>
       <div class="kpi-value" style="font-size:18px">${val}</div>
-      <div class="kpi-compare"><span style="font-size:10px;color:var(--text3)">${sub}</span></div>
+      <div class="kpi-compare">
+        <span style="font-size:10px;color:var(--text3)">${sub}</span>
+        ${extra?`<div style="font-size:10px;color:var(--text3);margin-top:3px">${extra}</div>`:''}
+      </div>
     </div>`;
   }
 
   grid.innerHTML=
+    ekpi('공헌이익',
+      totalRev>0 ? fmtWon(contribProfit)+'원' : '—',
+      '매출×80% - 광고비',
+      contribProfit>=0?'#43e97b':'#ff6584',
+      totalRev>0?`원가율 20% 적용`:'')+
+    ekpi('공헌이익률',
+      totalRev>0 ? contribMarginRate.toFixed(1)+'%' : '—',
+      '공헌이익 ÷ OY매출',
+      contribMarginRate>=30?'#43e97b':contribMarginRate>=10?'#f7971e':'#ff6584',
+      totalRev>0?`광고비만 제외 시 ${adOnlyMargin.toFixed(1)}%`:'')+
     ekpi('CAC (고객획득비용)',cac>0?fmtWon(cac)+'원':'—','광고비 ÷ 전환수','#6c63ff')+
-    ekpi('기여 마진율',contribMargin>0?contribMargin.toFixed(1)+'%':'—','(OY매출 - 광고비) ÷ OY매출','#43e97b')+
     ekpi('노출→전환율',clickToConv>0?clickToConv.toFixed(3)+'%':'—','클릭수 대비 구매수','#f7971e')+
     ekpi('노출당 매출',revenuePerImpr>0?fmtWon(revenuePerImpr)+'원':'—','OY매출 ÷ 1,000노출','#00c6ff')+
     ekpi('광고기여 매출',totalAdVal>0?fmtWon(totalAdVal)+'원':'—','1d click 기준','#ff6584')+
-    ekpi('광고의존도',totalRev>0&&totalAdVal>0?(totalAdVal/totalRev*100).toFixed(1)+'%':'—','광고기여매출 ÷ OY매출','#a18cd1');
+    ekpi('광고의존도',totalRev>0&&totalAdVal>0?(totalAdVal/totalRev*100).toFixed(1)+'%':'—','광고기여매출 ÷ OY매출','#a18cd1')+
+    ekpi('매출총이익',totalRev>0?fmtWon(grossProfit)+'원':'—','OY매출 × 80%','#a18cd1','원가율 20% 적용');
 }
 
 // ── 요일별 히트맵 ─────────────────────────────────────────────
@@ -1173,5 +1213,5 @@ function renderBudgetSuggestion(){
 }
 
 // ── 초기화 ────────────────────────────────────────────────────
-loadGoals();
+renderGoals(); // 페이지 로드 시 초기 메시지 표시
 </script>
