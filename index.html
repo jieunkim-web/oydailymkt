@@ -93,6 +93,11 @@ tr:hover td{background:rgba(108,99,255,0.04);}
 .badge-bad{background:rgba(255,101,132,0.15);color:#ff6584;}
 
 /* AI */
+.ai-typing::after{content:'▋';animation:blink-cursor 0.7s infinite;font-size:14px;color:var(--accent);}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+.ai-summary{background:linear-gradient(135deg,rgba(108,99,255,0.06),rgba(255,101,132,0.04));border:1px solid rgba(108,99,255,0.15);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--text);line-height:1.8;margin-bottom:12px;white-space:pre-wrap;}
+.ai-skeleton{height:16px;background:linear-gradient(90deg,var(--bg3) 25%,var(--border) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:6px;margin-bottom:8px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 .ai-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
 .ai-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .ai-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
@@ -108,6 +113,41 @@ tr:hover td{background:rgba(108,99,255,0.04);}
 .empty-state .icon{font-size:32px;margin-bottom:8px;}
 .empty-state p{font-size:13px;line-height:1.7;}
 
+/* 목표 달성률 배너 */
+.goal-banner{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:16px;display:none;}
+.goal-banner.show{display:block;}
+.goal-banner-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.goal-banner-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.goal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+.goal-item{background:var(--bg3);border-radius:10px;padding:12px 14px;}
+.goal-item-label{font-size:10px;color:var(--text2);margin-bottom:6px;font-weight:500;}
+.goal-bar-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.goal-bar-fill{height:100%;border-radius:3px;transition:width 0.6s ease;}
+.goal-nums{display:flex;justify-content:space-between;font-size:11px;}
+.goal-current{font-weight:700;}
+.goal-target{color:var(--text3);}
+.goal-pct{font-size:13px;font-weight:700;margin-left:auto;}
+.goal-inputs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.goal-input{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;padding:5px 9px;width:130px;font-family:inherit;outline:none;}
+.goal-input:focus{border-color:var(--accent);}
+/* 추가 KPI */
+.kpi-grid-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:16px;}
+/* 히트맵 */
+.heatmap-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+.heatmap-grid{display:grid;grid-template-columns:auto repeat(7,1fr);gap:3px;font-size:10px;}
+.heatmap-label{color:var(--text3);padding:4px 6px;display:flex;align-items:center;}
+.heatmap-cell{height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;cursor:default;transition:transform 0.1s;}
+.heatmap-cell:hover{transform:scale(1.08);z-index:1;position:relative;}
+.heatmap-day-header{text-align:center;padding:4px;color:var(--text3);font-weight:600;}
+/* 예산 배분 제안 */
+.budget-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+.budget-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.budget-ch{font-size:12px;font-weight:500;width:64px;flex-shrink:0;}
+.budget-bar-wrap{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative;}
+.budget-bar-cur{height:100%;border-radius:4px;opacity:0.4;position:absolute;top:0;left:0;}
+.budget-bar-opt{height:100%;border-radius:4px;position:absolute;top:0;left:0;}
+.budget-pcts{font-size:11px;color:var(--text2);white-space:nowrap;min-width:80px;}
+.budget-arrow{font-size:11px;min-width:60px;}
 @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.charts-grid{grid-template-columns:1fr;}}
 @media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.header{flex-direction:column;}}
 </style>
@@ -158,14 +198,33 @@ tr:hover td{background:rgba(108,99,255,0.04);}
   <span id="status-text"></span>
 </div>
 
-<div class="kpi-grid">
-  <div class="kpi-card" style="--accent-color:#6c63ff"><div class="kpi-label">총 광고비 (선택기간)</div><div class="kpi-value" id="kpi-spend">—</div><div class="kpi-compare" id="kpi-spend-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#43e97b"><div class="kpi-label" id="oy-kpi-label">OY 매출 (선택기간)</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-compare" id="kpi-revenue-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#f7971e"><div class="kpi-label">ROAS 1d (선택기간)</div><div class="kpi-value" id="kpi-roas">—</div><div class="kpi-compare" id="kpi-roas-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#ff6584"><div class="kpi-label">구매수 1d (선택기간)</div><div class="kpi-value" id="kpi-purchases">—</div><div class="kpi-compare" id="kpi-purchases-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#00c6ff"><div class="kpi-label">CTR 평균 (선택기간)</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-compare" id="kpi-ctr-cmp"></div></div>
-  <div class="kpi-card" style="--accent-color:#a18cd1"><div class="kpi-label">광고비/매출 (선택기간)</div><div class="kpi-value" id="kpi-ratio">—</div><div class="kpi-compare" id="kpi-ratio-cmp"></div></div>
+<!-- 목표 달성률 배너 -->
+<div class="goal-banner" id="goal-banner">
+  <div class="goal-banner-top">
+    <div class="goal-banner-title">🎯 이번 달 목표 달성률</div>
+    <div class="goal-inputs">
+      <span style="font-size:10px;color:var(--text3)">월 목표 매출</span>
+      <input class="goal-input" id="goal-revenue" type="text" placeholder="예: 2억" oninput="saveGoals();renderGoals()">
+      <span style="font-size:10px;color:var(--text3)">월 목표 광고비</span>
+      <input class="goal-input" id="goal-spend" type="text" placeholder="예: 3000만" oninput="saveGoals();renderGoals()">
+      <span style="font-size:10px;color:var(--text3)">목표 ROAS</span>
+      <input class="goal-input" id="goal-roas" type="text" placeholder="예: 2.5" style="width:80px" oninput="saveGoals();renderGoals()">
+    </div>
+  </div>
+  <div class="goal-grid" id="goal-grid"></div>
 </div>
+
+<div class="kpi-grid">
+  <div class="kpi-card" style="--accent-color:#6c63ff"><div class="kpi-label">총 광고비 (전일)</div><div class="kpi-value" id="kpi-spend">—</div><div class="kpi-compare" id="kpi-spend-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#43e97b"><div class="kpi-label" id="oy-kpi-label">OY 매출 (최신일)</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-compare" id="kpi-revenue-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#f7971e"><div class="kpi-label">ROAS 1d (전일)</div><div class="kpi-value" id="kpi-roas">—</div><div class="kpi-compare" id="kpi-roas-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#ff6584"><div class="kpi-label">구매수 1d (전일)</div><div class="kpi-value" id="kpi-purchases">—</div><div class="kpi-compare" id="kpi-purchases-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#00c6ff"><div class="kpi-label">CTR 평균 (전일)</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-compare" id="kpi-ctr-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#a18cd1"><div class="kpi-label">광고비/매출 (전일)</div><div class="kpi-value" id="kpi-ratio">—</div><div class="kpi-compare" id="kpi-ratio-cmp"></div></div>
+</div>
+
+<!-- 추가 지표 카드 -->
+<div class="kpi-grid-extra" id="extra-kpi-grid" style="display:none"></div>
 
 <div class="charts-grid">
   <div class="chart-card">
@@ -198,13 +257,51 @@ tr:hover td{background:rgba(108,99,255,0.04);}
   </div>
 </div>
 
+<!-- 요일별 성과 히트맵 -->
+<div class="heatmap-card" id="heatmap-card" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div>
+      <div class="chart-title">요일별 성과 히트맵</div>
+      <div class="chart-sub">진할수록 ROAS 높음 — 최근 8주 기준</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn active" onclick="setHeatmapMetric('roas',this)">ROAS</button>
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn" onclick="setHeatmapMetric('spend',this)">광고비</button>
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn" onclick="setHeatmapMetric('revenue',this)">매출</button>
+    </div>
+  </div>
+  <div class="heatmap-grid" id="heatmap-grid"></div>
+  <div style="display:flex;gap:16px;margin-top:12px;font-size:10px;color:var(--text3);flex-wrap:wrap" id="heatmap-insight"></div>
+</div>
+
+<!-- 매체별 예산 배분 제안 -->
+<div class="budget-card" id="budget-card" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div class="chart-title">📊 매체별 예산 배분 제안</div>
+      <div class="chart-sub">최근 30일 ROAS 기반 최적 배분 vs 현재 배분</div>
+    </div>
+    <div style="display:flex;gap:4px;font-size:10px;color:var(--text3);align-items:center">
+      <span style="width:10px;height:10px;background:var(--accent);opacity:0.4;display:inline-block;border-radius:2px"></span>현재
+      <span style="width:10px;height:10px;background:var(--accent);display:inline-block;border-radius:2px;margin-left:6px"></span>제안
+    </div>
+  </div>
+  <div id="budget-rows"></div>
+  <div id="budget-summary" style="margin-top:14px;padding:12px 14px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.7"></div>
+</div>
+
 <div class="ai-card">
   <div class="ai-header">
     <div class="ai-title"><div class="ai-icon">✦</div>AI 성과 분석 & 개선 액션</div>
-    <button class="btn btn-ghost" id="ai-btn" onclick="runAI()">분석 요청 ↗</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="ai-status" style="font-size:11px;color:var(--text3);display:none"></span>
+      <button class="btn btn-ghost" id="ai-btn" onclick="runAI()">분석 요청 ↗</button>
+    </div>
   </div>
-  <div class="ai-content" id="ai-content">데이터를 불러온 후 "분석 요청" 버튼을 누르면 현재 화면 데이터를 바탕으로 Claude가 분석해드려요.</div>
-  <ul class="action-list" id="action-list"></ul>
+  <div id="ai-result-wrap">
+    <div class="ai-content" id="ai-content">데이터를 불러온 후 "분석 요청" 버튼을 누르면 현재 화면 데이터를 바탕으로 Claude가 분석해드려요.</div>
+    <ul class="action-list" id="action-list"></ul>
+  </div>
 </div>
 
 </div>
@@ -392,8 +489,9 @@ async function loadAllData(){
 // KPI
 function renderKPI(){
   const latest=getLatestDate();if(!latest)return;
-  // 선택 기간 전체 합산 기준 (filterRows 사용)
-  let ydM=filterRows(allData.meta);
+  // partition_date를 정규화해서 비교
+  let ydM=allData.meta.filter(r=>normalizeDate(r.partition_date||'')===latest);
+  if(selectedProduct!=='all')ydM=ydM.filter(r=>r.product_name===selectedProduct);
   let p7M=getPrev7(allData.meta);
   const p7Days=new Set(p7M.map(r=>r.partition_date)).size||1;
 
@@ -413,14 +511,16 @@ function renderKPI(){
   const p7Roas=p7Spend>0?p7V7d/p7Spend:0;
   const p7Ctr=p7Impr>0?p7Clk/p7Impr*100:0;
 
-  // OY — 선택 기간 기준 filterRows 사용
-  const ydOY=filterRows(allData.oy,'partition_date');
-  const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
-  // OY 직전 7일 비교
+  // OY — OY 자체 최신 날짜 기준 (Meta latest와 독립)
   const oyAllDates=[...new Set(allData.oy.map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   const oyLatest=oyAllDates[oyAllDates.length-1]||latest;
-  const oyFromIdx=oyAllDates.indexOf(latest);
-  const oyPrev7Dates=oyFromIdx>0?oyAllDates.slice(Math.max(0,oyFromIdx-7),oyFromIdx):oyAllDates.slice(-8,-1);
+  document.getElementById('oy-kpi-label').textContent='OY 매출 ('+oyLatest+')';
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===oyLatest);
+  if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
+  const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  // OY 직전 7일 비교
+  const oyLatestIdx=oyAllDates.indexOf(oyLatest);
+  const oyPrev7Dates=oyLatestIdx>0?oyAllDates.slice(Math.max(0,oyLatestIdx-7),oyLatestIdx):[];
   let p7OY=allData.oy.filter(r=>oyPrev7Dates.includes(normalizeDate(r.partition_date||'')));
   if(selectedProduct!=='all')p7OY=p7OY.filter(r=>r.product_name===selectedProduct);
   const p7OYDays=new Set(p7OY.map(r=>normalizeDate(r.partition_date||''))).size||1;
@@ -453,9 +553,8 @@ function setKPI(id,val,cur,p7,unit){
 // 추세 차트
 function renderTrendChart(){
   const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
-  // OY도 동일한 날짜 범위 필터 적용 + 날짜 정규화
+  // OY 날짜 정규화 + filterRows 적용
   const fOY=filterRows(allData.oy,'partition_date');
-  // 날짜 정규화해서 통일된 키로 집계
   const dates=[...new Set([...fM,...fK,...fG].map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   if(!dates.length)return;
   const mD={},kD={},gD={},oyD={};
@@ -565,61 +664,514 @@ function renderProductTable(){
 
 function setEmpty(cols,msg){document.getElementById('main-tbody').innerHTML=`<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📭</div><p>${msg}</p></div></td></tr>`;}
 
-// AI 분석 — sendPrompt로 Claude에게 직접 전송
-function runAI(){
-  if(!allData.meta.length){document.getElementById('ai-content').textContent='먼저 데이터를 불러와주세요.';return;}
-  const latest=getLatestDate();
-  let ydM=allData.meta.filter(r=>r.partition_date===latest);
-  if(selectedProduct!=='all')ydM=ydM.filter(r=>r.product_name===selectedProduct);
-  let p7M=getPrev7(allData.meta);
-  const p7Days=new Set(p7M.map(r=>r.partition_date)).size||1;
+// ── AI 성과 분석 — Anthropic API 스트리밍 ──────────────────────────
+function buildAnalysisPrompt(){
+  const fM=filterRows(allData.meta);
+  const fK=filterRows(allData.kakao);
+  const fG=filterRows(allData.google);
+  const fOY=filterRows(allData.oy,'partition_date');
+  const p7M=getPrev7(allData.meta);
+  const p7K=getPrev7(allData.kakao);
+  const p7G=getPrev7(allData.google);
+  const p7Days=new Set(p7M.map(r=>normalizeDate(r.partition_date||''))).size||1;
 
-  const ydSpend=ydM.reduce((s,r)=>s+cleanNum(r.spend),0);
-  const ydV7d=ydM.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click),0);
-  const ydP7d=ydM.reduce((s,r)=>s+cleanNum(r.purchases_1d_click),0);
-  const p7Spend=p7M.reduce((s,r)=>s+cleanNum(r.spend),0)/p7Days;
-  const p7V7d=p7M.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click),0)/p7Days;
+  const agg=(rows,spendKey,valKey,convKey)=>({
+    spend:  rows.reduce((s,r)=>s+cleanNum(r[spendKey]||r.spend||0),0),
+    val:    rows.reduce((s,r)=>s+cleanNum(r[valKey]||r.purchase_value_1d_click||0),0),
+    conv:   rows.reduce((s,r)=>s+cleanNum(r[convKey]||r.purchases_1d_click||0),0),
+    impr:   rows.reduce((s,r)=>s+cleanNum(r.impressions||0),0),
+    click:  rows.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0),
+  });
 
-  let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===latest);
-  if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
-  const oyRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const mCur=agg(fM); const kCur=agg(fK); const gCur=agg(fG);
+  const mPre=agg(p7M); const kPre=agg(p7K); const gPre=agg(p7G);
+  const oyRev=fOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const p7OY=getPrev7(allData.oy,'partition_date');
+  const p7OYDays=new Set(p7OY.map(r=>normalizeDate(r.partition_date||''))).size||1;
+  const oyRevPre=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
 
+  const totalSpend=mCur.spend+kCur.spend+gCur.spend;
+  const totalVal=mCur.val+kCur.val+gCur.val;
+  const totalRoas=totalSpend>0?(totalVal/totalSpend).toFixed(2):0;
+
+  // 캠페인별 집계
   const camps={};
-  ydM.forEach(r=>{const k=r.campaign_name||'(없음)';if(!camps[k])camps[k]={spend:0,v1d:0,p1d:0};camps[k].spend+=cleanNum(r.spend);camps[k].v1d+=cleanNum(r.purchase_value_1d_click);camps[k].p1d+=cleanNum(r.purchases_1d_click);});
+  [...fM,...fK,...fG].forEach(r=>{
+    const ch=r.channel_name||'';
+    const k=(r.campaign_name||'(없음)');
+    if(!camps[k])camps[k]={spend:0,val:0,conv:0,impr:0,click:0};
+    camps[k].spend+=cleanNum(r.spend);
+    camps[k].val+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    camps[k].conv+=cleanNum(r.purchases_1d_click||r.purchases||0);
+    camps[k].impr+=cleanNum(r.impressions||0);
+    camps[k].click+=cleanNum(r.outbound_clicks||0);
+  });
+  const campLines=Object.entries(camps)
+    .sort((a,b)=>b[1].spend-a[1].spend).slice(0,8)
+    .map(([k,v])=>{
+      const roas=v.spend>0?(v.val/v.spend).toFixed(2):0;
+      const ctr=v.impr>0?(v.click/v.impr*100).toFixed(2):0;
+      return `  • ${k}: 지출 ${fmtWon(v.spend)}만원, ROAS ${roas}x, 구매 ${v.conv}건, CTR ${ctr}%`;
+    }).join('\n');
 
-  const msg=`[대시보드 자동 분석 요청]
-전일: ${latest}${selectedProduct!=='all'?' / 제품: '+selectedProduct:''}
+  const period=filterFrom===filterTo?filterFrom:`${filterFrom} ~ ${filterTo}`;
+  const prod=selectedProduct!=='all'?` [제품: ${selectedProduct}]`:'';
 
-Meta 광고 성과 (전일 기준)
-- 총 지출: ${fmtWon(ydSpend)}원
-- ROAS(7d): ${ydSpend>0?(ydV7d/ydSpend).toFixed(2):0}
-- 구매수(7d): ${ydP7d}건
-- 직전7일 일평균 지출: ${fmtWon(p7Spend)}원
-- 직전7일 일평균 ROAS: ${p7Spend>0?(p7V7d/p7Spend).toFixed(2):0}
-올리브영 전일 매출: ${fmtWon(oyRev)}원
+  return `당신은 퍼포먼스 마케팅 전문 분석가입니다. 아래 광고 성과 데이터를 분석해주세요.
 
-캠페인별 성과:
-${Object.entries(camps).map(([k,v])=>`- ${k}: 지출 ${fmtWon(v.spend)}원, ROAS ${v.spend>0?(v.v7d/v.spend).toFixed(2):0}, 구매 ${v.p7d}건`).join('\n')}
+분석 기간: ${period}${prod}
 
-위 데이터를 분석해서:
-1. 전체 성과 2-3줄 요약
-2. 개선 액션 5개 (우선순위 high 2개, mid 2개, low 1개) 제안해주세요.`;
+■ 전체 요약
+- 총 광고비: ${fmtWon(totalSpend)}만원
+- 총 광고 기여 매출(1d): ${fmtWon(totalVal)}만원
+- 전체 ROAS: ${totalRoas}x
+- OY 실제 매출: ${fmtWon(oyRev)}만원 (직전7일 일평균 ${fmtWon(oyRevPre)}만원)
+- 광고비/실제매출: ${oyRev>0?(totalSpend/oyRev*100).toFixed(1):'-'}%
 
-  document.getElementById('ai-content').textContent='✅ 분석 데이터를 Claude에게 전송했어요. 아래 채팅창에서 결과를 확인하세요!';
-  document.getElementById('action-list').innerHTML='';
+■ 매체별 성과
+- Meta: 광고비 ${fmtWon(mCur.spend)}만원, ROAS ${mCur.spend>0?(mCur.val/mCur.spend).toFixed(2):0}x, 구매 ${mCur.conv}건 (직전7일 일평균 ROAS ${mPre.spend>0?(mPre.val/mPre.spend/p7Days*p7Days).toFixed(2):0}x)
+- 카카오: 광고비 ${fmtWon(kCur.spend)}만원, ROAS ${kCur.spend>0?(kCur.val/kCur.spend).toFixed(2):0}x, 구매 ${kCur.conv}건
+- 구글: 광고비 ${fmtWon(gCur.spend)}만원, ROAS ${gCur.spend>0?(gCur.val/gCur.spend).toFixed(2):0}x, 구매 ${gCur.conv}건
 
-  if(typeof sendPrompt==='function'){
-    sendPrompt(msg);
-  } else {
-    navigator.clipboard.writeText(msg).then(()=>{
-      document.getElementById('ai-content').textContent='📋 클립보드에 복사됐어요! 이 채팅창에 Ctrl+V로 붙여넣으면 바로 분석해드려요.\n\n'+msg;
-    }).catch(()=>{
-      document.getElementById('ai-content').textContent=msg;
+■ 캠페인별 상세 (광고비 상위)
+${campLines}
+
+위 데이터를 바탕으로 아래 형식으로 정확히 응답해주세요:
+
+[요약]
+(전반적인 성과를 3줄 이내로 핵심만 간결하게)
+
+[액션]
+HIGH | (제목) | (구체적 실행 방법 1-2줄)
+HIGH | (제목) | (구체적 실행 방법 1-2줄)
+MID | (제목) | (구체적 실행 방법 1-2줄)
+MID | (제목) | (구체적 실행 방법 1-2줄)
+LOW | (제목) | (구체적 실행 방법 1-2줄)
+
+숫자 근거를 들어 구체적으로 작성해주세요.`;
+}
+
+async function runAI(){
+  if(!allData.meta.length){
+    document.getElementById('ai-content').textContent='먼저 데이터를 불러와주세요.';
+    return;
+  }
+  const btn=document.getElementById('ai-btn');
+  const statusEl=document.getElementById('ai-status');
+  const contentEl=document.getElementById('ai-content');
+  const actionEl=document.getElementById('action-list');
+
+  btn.disabled=true; btn.textContent='분석 중...';
+  statusEl.style.display='inline';
+  statusEl.textContent='⏳ Claude가 분석하는 중...';
+  actionEl.innerHTML='';
+
+  // 스켈레톤 로딩
+  contentEl.className='ai-content';
+  contentEl.innerHTML='<div class="ai-skeleton" style="width:90%"></div><div class="ai-skeleton" style="width:75%"></div><div class="ai-skeleton" style="width:82%"></div>';
+
+  const prompt=buildAnalysisPrompt();
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:(()=>{
+        const key=localStorage.getItem('oy_api_key')||'';
+        return {'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true',...(key?{'x-api-key':key}:{})};
+      })(),
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        stream:true,
+        system:'당신은 퍼포먼스 마케팅 전문가입니다. 데이터 기반으로 간결하고 실용적인 분석을 제공합니다. 반드시 지정된 형식([요약]/[액션])으로만 응답하세요.',
+        messages:[{role:'user',content:prompt}]
+      })
     });
+
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      throw new Error(err.error?.message||`API 오류 (${resp.status})`);
+    }
+
+    // 스트리밍 처리
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder();
+    let fullText='';
+    contentEl.innerHTML='';
+    contentEl.className='ai-content ai-typing';
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      const chunk=decoder.decode(value,{stream:true});
+      const lines=chunk.split('\n');
+      for(const line of lines){
+        if(!line.startsWith('data:'))continue;
+        const data=line.slice(5).trim();
+        if(data==='[DONE]')continue;
+        try{
+          const parsed=JSON.parse(data);
+          if(parsed.type==='content_block_delta'&&parsed.delta?.type==='text_delta'){
+            fullText+=parsed.delta.text;
+            // 실시간 렌더링
+            renderAIResult(fullText, true);
+          }
+        }catch(e){}
+      }
+    }
+
+    // 최종 렌더링
+    contentEl.className='ai-content';
+    renderAIResult(fullText, false);
+    statusEl.textContent='✅ 분석 완료';
+    setTimeout(()=>{statusEl.style.display='none';},3000);
+
+  }catch(e){
+    contentEl.className='ai-content';
+    contentEl.textContent='⚠ 분석 오류: '+e.message+'\n\nAPI 키가 필요해요. 아래 입력창에 Anthropic API 키를 입력해주세요.';
+    const keyWrap=document.createElement('li');
+    keyWrap.style.cssText='padding:10px;list-style:none';
+    const keyInput=document.createElement('input');
+    keyInput.id='api-key-input';
+    keyInput.type='password';
+    keyInput.placeholder='sk-ant-...';
+    keyInput.style.cssText='width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg3);color:var(--text);outline:none;font-family:monospace';
+    keyInput.addEventListener('input',function(){localStorage.setItem('oy_api_key',this.value);});
+    const keyHint=document.createElement('p');
+    keyHint.style.cssText='font-size:11px;color:var(--text3);margin-top:6px';
+    keyHint.innerHTML='Anthropic API 키를 입력하고 다시 분석 요청 버튼을 눌러주세요. <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">콘솔에서 발급 →</a>';
+    keyWrap.appendChild(keyInput);
+    keyWrap.appendChild(keyHint);
+    actionEl.innerHTML='';
+    actionEl.appendChild(keyWrap);
+    const saved=localStorage.getItem('oy_api_key');
+    if(saved)keyInput.value=saved;
+    statusEl.textContent='❌ 오류';
+  }
+  btn.disabled=false; btn.textContent='분석 요청 ↗';
+}
+
+function renderAIResult(text, streaming){
+  const contentEl=document.getElementById('ai-content');
+  const actionEl=document.getElementById('action-list');
+
+  // [요약] 파트 추출
+  const summaryMatch=text.match(/\[요약\]([\s\S]*?)(?=\[액션\]|$)/);
+  const actionMatch=text.match(/\[액션\]([\s\S]*?)$/);
+
+  if(summaryMatch){
+    const summary=summaryMatch[1].trim();
+    contentEl.innerHTML='<div class="ai-summary">'+escapeHtml(summary)+(streaming&&!actionMatch?'<span class="ai-typing-cursor">▋</span>':'')+'</div>';
+  } else {
+    // 아직 [요약] 태그 안 나온 경우 그냥 텍스트로
+    contentEl.textContent=text+(streaming?'▋':'');
+    return;
+  }
+
+  if(actionMatch){
+    const actionText=actionMatch[1].trim();
+    const lines=actionText.split('\n').filter(l=>l.trim());
+    const items=lines.map(line=>{
+      const parts=line.split('|').map(s=>s.trim());
+      if(parts.length>=3){
+        const level=parts[0].toUpperCase();
+        const cls=level==='HIGH'?'action-high':level==='MID'?'action-mid':'action-low';
+        const tag=level==='HIGH'?'🔴 HIGH':level==='MID'?'🟡 MID':'🟢 LOW';
+        return`<li class="action-item ${cls}"><span class="action-tag">${tag}</span><div><strong>${escapeHtml(parts[1])}</strong><br><span style="color:var(--text2)">${escapeHtml(parts[2])}</span></div></li>`;
+      }
+      return line.trim()?`<li class="action-item action-low"><div>${escapeHtml(line)}</div></li>`:'';
+    }).filter(Boolean).join('');
+    actionEl.innerHTML=items+(streaming?'<li style="padding:8px;color:var(--text3);font-size:12px">분석 중...</li>':'');
   }
 }
 
-function renderAll(){renderKPI();renderTrendChart();renderChannelChart();if(currentTab==='product')renderProductTable();else renderCampTable(currentTab);}
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderAll(){renderKPI();renderGoals();renderExtraKPI();renderTrendChart();renderChannelChart();renderHeatmap();renderBudgetSuggestion();if(currentTab==='product')renderProductTable();else renderCampTable(currentTab);}
 </script>
 </body>
 </html>
+<!-- NEW FEATURES JS -->
+<script>
+// ── 숫자 파싱 (목표값 입력: "2억", "3000만" 등) ─────────────
+function parseGoalInput(v){
+  if(!v)return 0;
+  const s=String(v).replace(/,/g,'').trim();
+  if(s.includes('억'))return parseFloat(s)*100000000;
+  if(s.includes('천만'))return parseFloat(s)*10000000;
+  if(s.includes('만'))return parseFloat(s)*10000;
+  return parseFloat(s)||0;
+}
+
+// ── 목표 저장/로드 ────────────────────────────────────────────
+function saveGoals(){
+  localStorage.setItem('oy_goals',JSON.stringify({
+    revenue:document.getElementById('goal-revenue').value,
+    spend:document.getElementById('goal-spend').value,
+    roas:document.getElementById('goal-roas').value
+  }));
+}
+function loadGoals(){
+  try{
+    const g=JSON.parse(localStorage.getItem('oy_goals')||'{}');
+    if(g.revenue)document.getElementById('goal-revenue').value=g.revenue;
+    if(g.spend)document.getElementById('goal-spend').value=g.spend;
+    if(g.roas)document.getElementById('goal-roas').value=g.roas;
+  }catch(e){}
+}
+
+// ── 목표 달성률 렌더 ─────────────────────────────────────────
+function renderGoals(){
+  if(!allData.meta.length)return;
+  const banner=document.getElementById('goal-banner');
+  banner.classList.add('show');
+
+  const goalRev=parseGoalInput(document.getElementById('goal-revenue').value);
+  const goalSpend=parseGoalInput(document.getElementById('goal-spend').value);
+  const goalRoas=parseFloat(document.getElementById('goal-roas').value)||0;
+
+  // 이번 달 데이터 집계
+  const now=new Date();
+  const monthStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+  const monthEnd=now.toISOString().slice(0,10);
+  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+  const daysPassed=now.getDate();
+
+  const mthAds=[...allData.meta,...allData.kakao,...allData.google]
+    .filter(r=>{const d=normalizeDate(r.partition_date||'');return d>=monthStart&&d<=monthEnd;});
+  const mthOY=allData.oy.filter(r=>{const d=normalizeDate(r.partition_date||'');return d>=monthStart&&d<=monthEnd;});
+
+  const curSpend=mthAds.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const curRev=mthOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const curAdVal=mthAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+  const curRoas=curSpend>0?curAdVal/curSpend:0;
+
+  // 일평균으로 월말 예측
+  const projRev=daysPassed>0?curRev/daysPassed*daysInMonth:0;
+  const projSpend=daysPassed>0?curSpend/daysPassed*daysInMonth:0;
+
+  function goalItem(label,cur,goal,proj,unit,isLower){
+    if(!goal)return'';
+    const pct=Math.min(Math.round(cur/goal*100),200);
+    const projPct=Math.min(Math.round(proj/goal*100),200);
+    const good=isLower?(pct<=100):(pct>=80);
+    const color=pct>=100?'#43e97b':pct>=70?'#f7971e':'#ff6584';
+    const fmt=v=>unit==='x'?v.toFixed(2)+'x':fmtWon(v)+(unit==='원'?'원':'');
+    return`<div class="goal-item">
+      <div class="goal-item-label">${label}</div>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div>
+      </div>
+      <div class="goal-nums">
+        <span class="goal-current" style="color:${color}">${fmt(cur)}</span>
+        <span class="goal-target">목표 ${fmt(goal)}</span>
+        <span class="goal-pct" style="color:${color}">${pct}%</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">
+        📈 이 추세면 월말 ${fmt(projRev>0||unit==='x'?proj:projSpend)} 예상 (${projPct}%)
+      </div>
+    </div>`;
+  }
+
+  document.getElementById('goal-grid').innerHTML=
+    goalItem('이번달 OY 매출',curRev,goalRev,projRev,'원',false)+
+    goalItem('이번달 광고비',curSpend,goalSpend,projSpend,'원',true)+
+    (goalRoas?`<div class="goal-item">
+      <div class="goal-item-label">ROAS</div>
+      <div class="goal-bar-wrap"><div class="goal-bar-fill" style="width:${Math.min(curRoas/goalRoas*100,100)}%;background:${curRoas>=goalRoas?'#43e97b':curRoas>=goalRoas*0.7?'#f7971e':'#ff6584'}"></div></div>
+      <div class="goal-nums">
+        <span class="goal-current" style="color:${curRoas>=goalRoas?'#43e97b':'#f7971e'}">${curRoas.toFixed(2)}x</span>
+        <span class="goal-target">목표 ${goalRoas}x</span>
+        <span class="goal-pct" style="color:${curRoas>=goalRoas?'#43e97b':'#ff6584'}">${Math.round(curRoas/goalRoas*100)}%</span>
+      </div>
+    </div>`:'');
+}
+
+// ── 추가 KPI (CAC, 기여마진율 등) ────────────────────────────
+function renderExtraKPI(){
+  if(!allData.meta.length)return;
+  const grid=document.getElementById('extra-kpi-grid');
+  grid.style.display='grid';
+
+  const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
+  const fOY=filterRows(allData.oy,'partition_date');
+
+  const allAds=[...fM,...fK,...fG];
+  const totalSpend=allAds.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const totalConv=allAds.reduce((s,r)=>s+cleanNum(r.purchases_1d_click||r.purchases||0),0);
+  const totalAdVal=allAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+  const totalRev=fOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const totalImpr=allAds.reduce((s,r)=>s+cleanNum(r.impressions||0),0);
+  const totalClick=allAds.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0);
+
+  const cac=totalConv>0?totalSpend/totalConv:0;
+  const contribMargin=totalRev>0?(totalRev-totalSpend)/totalRev*100:0;
+  const revenuePerImpr=totalImpr>0?totalRev/totalImpr*1000:0;
+  const clickToConv=totalClick>0?totalConv/totalClick*100:0;
+
+  function ekpi(label,val,sub,color){
+    return`<div class="kpi-card" style="--accent-color:${color}">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value" style="font-size:18px">${val}</div>
+      <div class="kpi-compare"><span style="font-size:10px;color:var(--text3)">${sub}</span></div>
+    </div>`;
+  }
+
+  grid.innerHTML=
+    ekpi('CAC (고객획득비용)',cac>0?fmtWon(cac)+'원':'—','광고비 ÷ 전환수','#6c63ff')+
+    ekpi('기여 마진율',contribMargin>0?contribMargin.toFixed(1)+'%':'—','(OY매출 - 광고비) ÷ OY매출','#43e97b')+
+    ekpi('노출→전환율',clickToConv>0?clickToConv.toFixed(3)+'%':'—','클릭수 대비 구매수','#f7971e')+
+    ekpi('노출당 매출',revenuePerImpr>0?fmtWon(revenuePerImpr)+'원':'—','OY매출 ÷ 1,000노출','#00c6ff')+
+    ekpi('광고기여 매출',totalAdVal>0?fmtWon(totalAdVal)+'원':'—','1d click 기준','#ff6584')+
+    ekpi('광고의존도',totalRev>0&&totalAdVal>0?(totalAdVal/totalRev*100).toFixed(1)+'%':'—','광고기여매출 ÷ OY매출','#a18cd1');
+}
+
+// ── 요일별 히트맵 ─────────────────────────────────────────────
+let heatmapMetric='roas';
+function setHeatmapMetric(m,btn){
+  heatmapMetric=m;
+  document.querySelectorAll('.heatmap-metric-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHeatmap();
+}
+
+function renderHeatmap(){
+  if(!allData.meta.length)return;
+  document.getElementById('heatmap-card').style.display='block';
+
+  const days=['월','화','수','목','금','토','일'];
+  const all=[...allData.meta,...allData.kakao,...allData.google];
+  // 최근 8주
+  const now=new Date();
+  const cutoff=new Date(now); cutoff.setDate(cutoff.getDate()-56);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+
+  // 주 × 요일 집계
+  const weekMap={};
+  all.forEach(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    if(!d||d<cutoffStr)return;
+    const dt=new Date(d);
+    const dow=(dt.getDay()+6)%7; // 0=월
+    const weekKey=d.slice(0,7)+'-W'+Math.floor(dt.getDate()/7);
+    const k=weekKey+'_'+dow;
+    if(!weekMap[k])weekMap[k]={spend:0,val:0,impr:0,conv:0,week:weekKey,dow};
+    weekMap[k].spend+=cleanNum(r.spend);
+    weekMap[k].val+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    weekMap[k].impr+=cleanNum(r.impressions||0);
+    weekMap[k].conv+=cleanNum(r.purchases_1d_click||r.purchases||0);
+  });
+
+  // 요일별 평균
+  const dowAgg=Array(7).fill(null).map(()=>({spend:0,val:0,impr:0,conv:0,cnt:0}));
+  Object.values(weekMap).forEach(v=>{
+    dowAgg[v.dow].spend+=v.spend;
+    dowAgg[v.dow].val+=v.val;
+    dowAgg[v.dow].impr+=v.impr;
+    dowAgg[v.dow].conv+=v.conv;
+    dowAgg[v.dow].cnt++;
+  });
+
+  const vals=dowAgg.map(d=>{
+    if(!d.cnt)return 0;
+    if(heatmapMetric==='roas')return d.spend>0?d.val/d.spend:0;
+    if(heatmapMetric==='spend')return d.spend/d.cnt;
+    return d.val/d.cnt;
+  });
+  const maxV=Math.max(...vals,0.001);
+  const minV=Math.min(...vals.filter(v=>v>0),maxV);
+
+  const grid=document.getElementById('heatmap-grid');
+  // 헤더 행
+  let html='<div class="heatmap-label"></div>';
+  days.forEach(d=>{ html+=`<div class="heatmap-day-header">${d}</div>`; });
+  // 지표 행
+  const metricLabel=heatmapMetric==='roas'?'ROAS':heatmapMetric==='spend'?'평균 광고비':'평균 매출';
+  html+=`<div class="heatmap-label" style="font-size:10px">${metricLabel}</div>`;
+  vals.forEach((v,i)=>{
+    const intensity=maxV>0?(v-minV)/(maxV-minV):0;
+    const alpha=0.1+intensity*0.85;
+    const bg=`rgba(108,99,255,${alpha.toFixed(2)})`;
+    const textColor=intensity>0.6?'#fff':'var(--text)';
+    const display=heatmapMetric==='roas'?v.toFixed(2)+'x':fmtWon(v);
+    html+=`<div class="heatmap-cell" style="background:${bg};color:${textColor}" title="${days[i]}: ${display}">${display}</div>`;
+  });
+  grid.innerHTML=html;
+
+  // 인사이트
+  const bestDow=vals.indexOf(Math.max(...vals));
+  const worstDow=vals.indexOf(Math.min(...vals.filter(v=>v>0)));
+  const insight=document.getElementById('heatmap-insight');
+  insight.innerHTML=`
+    <span>🟣 최고 성과 요일: <strong>${days[bestDow]}</strong> (${heatmapMetric==='roas'?vals[bestDow].toFixed(2)+'x':fmtWon(vals[bestDow])})</span>
+    <span>⚪ 최저 성과 요일: <strong>${days[worstDow]}</strong> (${heatmapMetric==='roas'?vals[worstDow].toFixed(2)+'x':fmtWon(vals[worstDow])})</span>
+    <span style="color:var(--text3)">최근 8주 기준 일평균</span>
+  `;
+}
+
+// ── 매체별 예산 배분 제안 ─────────────────────────────────────
+function renderBudgetSuggestion(){
+  if(!allData.meta.length)return;
+  document.getElementById('budget-card').style.display='block';
+
+  // 최근 30일
+  const now=new Date();
+  const cutoff=new Date(now); cutoff.setDate(cutoff.getDate()-30);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+
+  const channels=[
+    {key:'meta',  name:'Meta',  color:'#6c63ff', rows:allData.meta},
+    {key:'kakao', name:'카카오',color:'#f7971e', rows:allData.kakao},
+    {key:'google',name:'구글',  color:'#00c6ff', rows:allData.google},
+  ];
+
+  const stats=channels.map(ch=>{
+    const rows=ch.rows.filter(r=>normalizeDate(r.partition_date||'')>=cutoffStr);
+    const spend=rows.reduce((s,r)=>s+cleanNum(r.spend),0);
+    const val=rows.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+    const roas=spend>0?val/spend:0;
+    return{...ch,spend,val,roas};
+  }).filter(c=>c.spend>0);
+
+  if(!stats.length){document.getElementById('budget-card').style.display='none';return;}
+
+  const totalSpend=stats.reduce((s,c)=>s+c.spend,0);
+  // ROAS 기반 최적 배분 (ROAS 가중 소프트맥스)
+  const roasSum=stats.reduce((s,c)=>s+Math.max(c.roas,0.1),0);
+  stats.forEach(c=>{
+    c.curPct=Math.round(c.spend/totalSpend*100);
+    c.optPct=Math.round(Math.max(c.roas,0.1)/roasSum*100);
+  });
+  // 합이 100이 되도록 조정
+  const diff=100-stats.reduce((s,c)=>s+c.optPct,0);
+  if(stats.length)stats[0].optPct+=diff;
+
+  const rows=document.getElementById('budget-rows');
+  rows.innerHTML=stats.map(c=>{
+    const delta=c.optPct-c.curPct;
+    const arrow=delta>2?`<span style="color:#43e97b">▲ +${delta}%p</span>`:delta<-2?`<span style="color:#ff6584">▼ ${delta}%p</span>`:`<span style="color:var(--text3)">→ 유지</span>`;
+    return`<div class="budget-row">
+      <span class="budget-ch">${c.name}</span>
+      <div class="budget-bar-wrap">
+        <div class="budget-bar-cur" style="width:${c.curPct}%;background:${c.color}"></div>
+        <div class="budget-bar-opt" style="width:${c.optPct}%;background:${c.color}"></div>
+      </div>
+      <span class="budget-pcts" style="color:${c.color}">${c.curPct}% → ${c.optPct}%</span>
+      <span class="budget-arrow">${arrow}</span>
+      <span style="font-size:10px;color:var(--text3)">ROAS ${c.roas.toFixed(2)}x</span>
+    </div>`;
+  }).join('');
+
+  const best=stats.reduce((a,b)=>a.roas>b.roas?a:b);
+  const worst=stats.reduce((a,b)=>a.roas<b.roas?a:b);
+  const summary=document.getElementById('budget-summary');
+  summary.innerHTML=`
+    <strong>💡 제안 근거:</strong> 최근 30일 ROAS 기준 <strong>${best.name}</strong>이 ${best.roas.toFixed(2)}x로 가장 효율적이에요.
+    ${worst.roas<1?`<strong>${worst.name}</strong>은 ROAS ${worst.roas.toFixed(2)}x로 광고비 회수가 안 되고 있어 비중 축소를 검토해보세요.`:''}
+    예산 총액 ${fmtWon(totalSpend)}원 유지 시 현재 배분보다 약 <strong>${Math.round((best.roas-stats.reduce((s,c)=>s+c.roas*c.curPct/100,0))*10)/10}x 개선</strong> 가능해요.
+  `;
+}
+
+// ── 초기화 ────────────────────────────────────────────────────
+loadGoals();
+</script>
