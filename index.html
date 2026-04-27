@@ -404,8 +404,11 @@ function setRange(days,btn){
   document.getElementById('custom-inputs').style.display=days===0?'flex':'none';
   if(days===0||!allData.meta.length){updateDateDisplay();return;}
   const dates=getAllDates();if(!dates.length)return;
-  filterTo=dates[dates.length-1];
-  filterFrom=days===1?filterTo:dates[Math.max(0,dates.length-days)];
+  const adLatest=dates[dates.length-1];
+  const oyLast=getOYLatestDate();
+  // filterTo = 광고 최신일 vs OY 최신일 중 더 최신
+  filterTo = oyLast&&oyLast>adLatest ? oyLast : adLatest;
+  filterFrom=days===1?adLatest:dates[Math.max(0,dates.length-days)];
   updateDateDisplay();renderAll();
 }
 function applyCustomRange(){
@@ -497,14 +500,17 @@ async function loadAllData(){
     }catch(e){allData.oy=[];console.error('OY오류:',e);}
 
     const dates=getAllDates();
-    if(dates.length){filterTo=dates[dates.length-1];filterFrom=dates[Math.max(0,dates.length-7)];}
-    else{
-      // 날짜 못 찾으면 메타 첫 행 샘플 확인
+    if(!dates.length){
       const sample=allData.meta.slice(0,1).map(r=>JSON.stringify(r)).join('');
       setStatus('날짜 인식 실패. 샘플: '+sample,'error');
       btn.disabled=false;btn.textContent='데이터 불러오기';
       return;
     }
+    // filterTo = 광고 최신일과 OY 최신일 중 더 최신값
+    const adLatest  = dates[dates.length-1];
+    const oyLatest2 = getOYLatestDate();
+    filterTo   = oyLatest2 && oyLatest2>adLatest ? oyLatest2 : adLatest;
+    filterFrom = dates[Math.max(0,dates.length-7)];
     updateDateDisplay();
     buildProductFilter();
     renderAll();
@@ -567,7 +573,7 @@ function renderKPI(){
   setKPI('kpi-ctr',      ydCtr.toFixed(2)+'%',         ydCtr,  p7Ctr,  '%');
   setKPI('kpi-ratio',    ydRatio>0?ydRatio.toFixed(1)+'%':'—', ydRatio, p7Ratio, '%');
 
-  document.getElementById('filter-summary').textContent=`Meta 전일: ${latest} / OY 최신: ${oyLatest}${selectedProduct!=='all'?' · '+selectedProduct:''}`;
+  document.getElementById('filter-summary').textContent='';
   const oyLbl=document.getElementById('oy-kpi-label');
   if(oyLbl)oyLbl.textContent='OY 매출 ('+oyLatest+')';
 }
@@ -584,9 +590,15 @@ function setKPI(id,val,cur,p7,unit){
 // 추세 차트
 function renderTrendChart(){
   const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
-  // OY 날짜 정규화 + filterRows 적용
-  const fOY=filterRows(allData.oy,'partition_date');
-  const dates=[...new Set([...fM,...fK,...fG].map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  // OY는 filterFrom~filterTo 범위 내 데이터 (OY 최신일 포함)
+  const fOY=allData.oy.filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    return d>=filterFrom&&d<=filterTo&&(selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
+  // 날짜 = 광고 날짜 + OY 날짜 합집합 (OY 4/26도 포함)
+  const adDates=[...fM,...fK,...fG].map(r=>normalizeDate(r.partition_date||''));
+  const oyDates=fOY.map(r=>normalizeDate(r.partition_date||''));
+  const dates=[...new Set([...adDates,...oyDates])].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   if(!dates.length)return;
   const mD={},kD={},gD={},oyD={};
   dates.forEach(d=>{mD[d]=0;kD[d]=0;gD[d]=0;oyD[d]=0;});
