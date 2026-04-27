@@ -359,10 +359,19 @@ function normalizeDate(d){
   return d;
 }
 function getAllDates(){
-  const s=new Set([...allData.meta,...allData.kakao,...allData.google]
+  // 광고 데이터 날짜
+  const adDates=[...allData.meta,...allData.kakao,...allData.google]
     .map(r=>normalizeDate(r.partition_date||''))
-    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)));
-  return[...s].sort();
+    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d));
+  return[...new Set(adDates)].sort();
+}
+function getOYLatestDate(){
+  // OY는 별도 최신 날짜 (광고보다 하루 늦을 수 있음)
+  const oyDates=allData.oy
+    .map(r=>normalizeDate(r.partition_date||''))
+    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d));
+  if(!oyDates.length)return '';
+  return oyDates.sort()[oyDates.length-1];
 }
 function getLatestDate(){return filterTo;}
 function filterRows(rows,dateKey){
@@ -466,10 +475,25 @@ async function loadAllData(){
         oyHeaders.forEach((h,i)=>{
           if(!h)return;
           const cell=row.c&&row.c[i];
-          obj[h]=cell&&cell.v!==null&&cell.v!==undefined?String(cell.v):'';
+          if(!cell||cell.v===null||cell.v===undefined){obj[h]='';return;}
+          // gviz Date 형식: "Date(2026,3,26)" → 월은 0-indexed
+          if(typeof cell.v==='string'&&cell.v.startsWith('Date(')){
+            const m=cell.v.match(/Date\((\d+),(\d+),(\d+)\)/);
+            if(m){
+              const yr=m[1], mo=String(+m[2]+1).padStart(2,'0'), dy=String(+m[3]).padStart(2,'0');
+              obj[h]=`${yr}-${mo}-${dy}`;
+            }else obj[h]=cell.v;
+          }else if(cell.f&&h==='partition_date'){
+            // formatted value 우선 사용 (YYYY-MM-DD 형식이면)
+            const fmt=String(cell.f).trim();
+            if(/^\d{4}-\d{2}-\d{2}$/.test(fmt))obj[h]=fmt;
+            else obj[h]=String(cell.v);
+          }else{
+            obj[h]=String(cell.v);
+          }
         });
         return obj;
-      }).filter(r=>r.actual_revenue&&r.partition_date&&r.partition_date!='null');
+      }).filter(r=>r.actual_revenue&&r.partition_date&&r.partition_date!=='null'&&/^\d{4}-\d{2}-\d{2}$/.test(r.partition_date));
     }catch(e){allData.oy=[];console.error('OY오류:',e);}
 
     const dates=getAllDates();
@@ -485,10 +509,10 @@ async function loadAllData(){
     buildProductFilter();
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
-    // OY partition_date 원시값 샘플 — 정규화 전 raw 값
-    const oyRawDates=allData.oy.slice(0,5).map(r=>`[${r.partition_date}]`).join(' ');
-    const oyApril=allData.oy.filter(r=>{const d=r.partition_date||'';return d.includes('2026-04')||d.includes('2026/04')||d.includes('04/2026');}).length;
-    setStatus(`OY raw날짜샘플: ${oyRawDates} | 4월포함행: ${oyApril} | Meta범위: ${filterFrom}~${filterTo}`,'success');
+    const oyLast=getOYLatestDate();
+    setStatus(`✅ 로드 완료 · 광고: ${filterFrom}~${filterTo} · OY 최신: ${oyLast||'없음'} · 목표: ${allData.goals.length}행`,'success');
+    // 데이터 로드 완료 후 AI 자동 분석 실행
+    setTimeout(()=>{ runAI(); }, 800);
   }catch(e){setStatus('오류: '+e.message,'error');}
   btn.disabled=false;btn.textContent='데이터 불러오기';
 }
@@ -519,13 +543,13 @@ function renderKPI(){
   const p7Ctr=p7Impr>0?p7Clk/p7Impr*100:0;
 
   // OY — OY 자체 최신 날짜 기준 (Meta latest와 독립)
-  const oyAllDates=[...new Set(allData.oy.map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
-  const oyLatest=oyAllDates[oyAllDates.length-1]||latest;
+  const oyLatest=getOYLatestDate()||latest;
   document.getElementById('oy-kpi-label').textContent='OY 매출 ('+oyLatest+')';
   let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===oyLatest);
   if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
   const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
   // OY 직전 7일 비교
+  const oyAllDates=[...new Set(allData.oy.map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
   const oyLatestIdx=oyAllDates.indexOf(oyLatest);
   const oyPrev7Dates=oyLatestIdx>0?oyAllDates.slice(Math.max(0,oyLatestIdx-7),oyLatestIdx):[];
   let p7OY=allData.oy.filter(r=>oyPrev7Dates.includes(normalizeDate(r.partition_date||'')));
@@ -645,26 +669,49 @@ function renderCampTable(tab){
 
 function renderProductTable(){
   document.getElementById('camp-date-lbl').textContent='(선택 기간 기준)';
-  document.getElementById('main-thead').innerHTML='<tr><th>제품명</th><th>OY 매출</th><th>판매량</th><th>Meta 광고비</th><th>ROAS 1d</th><th>구매 1d</th><th>CVR</th><th>광고비/매출</th></tr>';
-  const fOY=filterRows(allData.oy,'partition_date'),fM=filterRows(allData.meta);
+  document.getElementById('main-thead').innerHTML='<tr><th>제품명</th><th>OY 매출</th><th>실수령액</th><th>공헌이익</th><th>공헌이익률</th><th>판매량</th><th>광고비</th><th>ROAS</th><th>CVR</th><th>광고비/매출</th></tr>';
+  const fOY=filterRows(allData.oy,'partition_date');
+  const fAll=[...filterRows(allData.meta),...filterRows(allData.kakao),...filterRows(allData.google)];
   const prods={};
-  fOY.forEach(r=>{const k=r.product_name||'(없음)';if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p1d:0,v1d:0,clicks:0};prods[k].rev+=cleanNum(r.actual_revenue);prods[k].qty+=cleanNum(r['판매량']||0);});
-  fM.forEach(r=>{const k=r.product_name||'';if(k&&prods[k]){prods[k].spend+=cleanNum(r.spend);prods[k].p1d+=cleanNum(r.purchases_1d_click||0);prods[k].v1d+=cleanNum(r.purchase_value_1d_click||0);prods[k].clicks+=cleanNum(r.outbound_clicks||0);}});
-  if(!Object.keys(prods).length){setEmpty(8,'제품 데이터 없음');return;}
+  fOY.forEach(r=>{
+    const k=r.product_name||'(없음)';
+    if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p1d:0,v1d:0,clicks:0,impr:0};
+    prods[k].rev+=cleanNum(r.actual_revenue);
+    prods[k].qty+=cleanNum(r['판매량']||0);
+  });
+  fAll.forEach(r=>{
+    const k=r.product_name||'';
+    if(!k)return;
+    if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p1d:0,v1d:0,clicks:0,impr:0};
+    prods[k].spend+=cleanNum(r.spend);
+    prods[k].p1d+=cleanNum(r.purchases_1d_click||r.purchases||0);
+    prods[k].v1d+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    prods[k].clicks+=cleanNum(r.outbound_clicks||0);
+    prods[k].impr+=cleanNum(r.impressions||0);
+  });
+  if(!Object.keys(prods).length){setEmpty(10,'제품 데이터 없음');return;}
   document.getElementById('main-tbody').innerHTML=Object.entries(prods).sort((a,b)=>b[1].rev-a[1].rev).map(([n,v])=>{
-    const roas=v.spend>0?v.v1d/v.spend:0;
-    const ratio=v.rev>0?v.spend/v.rev*100:0;
-    const cvr=v.clicks>0?v.p1d/v.clicks*100:0;
-    const roasColor=roas>=1?'#1a9e5c':roas>=0.5?'#d97706':'#e53935';
-    return`<tr>
-      <td style="font-weight:500">${n}</td>
+    const OY_COM=0.50, COGS=0.20;
+    const netRev   = v.rev*(1-OY_COM);
+    const grossP   = netRev*(1-COGS);
+    const contribP = grossP - v.spend;
+    const contribR = v.rev>0?(contribP/v.rev*100):0;
+    const roas     = v.spend>0?v.v1d/v.spend:0;
+    const ratio    = v.rev>0?v.spend/v.rev*100:0;
+    const cvr      = v.clicks>0?v.p1d/v.clicks*100:0;
+    const contribColor = contribP>=0?'#1a9e5c':'#e53935';
+    const roasColor    = roas>=2?'#1a9e5c':roas>=1?'#d97706':'#e53935';
+    return `<tr>
+      <td style="font-weight:500;max-width:150px;white-space:normal">${n}</td>
       <td style="color:#1a9e5c;font-weight:600">${fmtWon(v.rev)}원</td>
+      <td style="color:var(--text2)">${v.rev>0?fmtWon(netRev)+'원':'—'}</td>
+      <td style="font-weight:600;color:${contribColor}">${v.rev>0?fmtWon(contribP)+'원':'—'}</td>
+      <td style="color:${contribColor}">${v.rev>0?contribR.toFixed(1)+'%':'—'}</td>
       <td>${fmtNum(v.qty)}개</td>
       <td>${v.spend>0?fmtWon(v.spend)+'원':'—'}</td>
       <td style="font-weight:600;color:${roasColor}">${roas>0?roas.toFixed(2)+'x':'—'}</td>
-      <td>${v.p1d>0?fmtNum(v.p1d)+'건':'—'}</td>
       <td>${cvr>0?cvr.toFixed(2)+'%':'—'}</td>
-      <td style="color:${ratio>0&&ratio<30?'#1a9e5c':ratio<50?'#d97706':'#e53935'}">${ratio>0?ratio.toFixed(1)+'%':'—'}</td>
+      <td style="color:${ratio>0&&ratio<30?'#1a9e5c':ratio<60?'#d97706':'#e53935'}">${ratio>0?ratio.toFixed(1)+'%':'—'}</td>
     </tr>`;
   }).join('');
 }
@@ -700,6 +747,8 @@ function buildAnalysisPrompt(){
   const totalSpend=mCur.spend+kCur.spend+gCur.spend;
   const totalVal=mCur.val+kCur.val+gCur.val;
   const totalRoas=totalSpend>0?(totalVal/totalSpend).toFixed(2):0;
+  const totConv=mCur.conv+kCur.conv+gCur.conv;
+  const totClk=mCur.click+kCur.click+gCur.click;
 
   // 캠페인별 집계
   const camps={};
@@ -724,38 +773,60 @@ function buildAnalysisPrompt(){
   const period=filterFrom===filterTo?filterFrom:`${filterFrom} ~ ${filterTo}`;
   const prod=selectedProduct!=='all'?` [제품: ${selectedProduct}]`:'';
 
-  return `당신은 퍼포먼스 마케팅 전문 분석가입니다. 아래 광고 성과 데이터를 분석해주세요.
+  // 공헌이익 계산
+  const OY_COM = 0.50, COGS = 0.20;
+  const netRev   = oyRev * (1 - OY_COM);
+  const grossP   = netRev * (1 - COGS);
+  const contribP = grossP - totalSpend;
+  const contribR = oyRev > 0 ? (contribP/oyRev*100).toFixed(1) : '-';
+  const cac      = totConv > 0 ? Math.round(totalSpend/totConv) : 0;
+  const cvr      = totClk  > 0 ? (totConv/totClk*100).toFixed(2) : '-';
+
+  // 목표 대비
+  const refYM = filterTo ? filterTo.slice(0,7).replace('-','') : '';
+  const goal  = allData.goals.find(g=>g.yearmonth===refYM&&g.product==='전체')||null;
+  const goalLine = goal
+    ? `\n- 월 목표 매출: ${fmtWon(goal.goalRevenue)}원 (달성률 ${oyRev>0?Math.round(oyRev/goal.goalRevenue*100):0}%), 목표 ROAS: ${goal.goalRoas}x`
+    : '';
+
+  return `당신은 올리브영 입점 뷰티 브랜드의 퍼포먼스 마케팅 전문 분석가입니다.
 
 분석 기간: ${period}${prod}
+※ OY = 올리브영 (수수료 50%, 원가율 20% 적용)
 
-■ 전체 요약
-- 총 광고비: ${fmtWon(totalSpend)}만원
-- 총 광고 기여 매출(1d): ${fmtWon(totalVal)}만원
+■ 수익성 지표
+- OY 실제 매출: ${fmtWon(oyRev)}원 (직전7일 일평균 ${fmtWon(oyRevPre)}원)
+- 실수령액 (수수료 차감): ${fmtWon(netRev)}원
+- 매출총이익: ${fmtWon(grossP)}원
+- 공헌이익: ${fmtWon(contribP)}원 (공헌이익률 ${contribR}%)${goalLine}
+
+■ 광고 성과
+- 총 광고비: ${fmtWon(totalSpend)}원
+- 광고기여매출(1d): ${fmtWon(totalVal)}원
 - 전체 ROAS: ${totalRoas}x
-- OY 실제 매출: ${fmtWon(oyRev)}만원 (직전7일 일평균 ${fmtWon(oyRevPre)}만원)
-- 광고비/실제매출: ${oyRev>0?(totalSpend/oyRev*100).toFixed(1):'-'}%
+- CAC: ${fmtWon(cac)}원/건
+- CVR (클릭→구매): ${cvr}%
+- 광고비/OY매출: ${oyRev>0?(totalSpend/oyRev*100).toFixed(1):'-'}%
 
 ■ 매체별 성과
-- Meta: 광고비 ${fmtWon(mCur.spend)}만원, ROAS ${mCur.spend>0?(mCur.val/mCur.spend).toFixed(2):0}x, 구매 ${mCur.conv}건 (직전7일 일평균 ROAS ${mPre.spend>0?(mPre.val/mPre.spend/p7Days*p7Days).toFixed(2):0}x)
-- 카카오: 광고비 ${fmtWon(kCur.spend)}만원, ROAS ${kCur.spend>0?(kCur.val/kCur.spend).toFixed(2):0}x, 구매 ${kCur.conv}건
-- 구글: 광고비 ${fmtWon(gCur.spend)}만원, ROAS ${gCur.spend>0?(gCur.val/gCur.spend).toFixed(2):0}x, 구매 ${gCur.conv}건
+- Meta: 광고비 ${fmtWon(mCur.spend)}원, ROAS ${mCur.spend>0?(mCur.val/mCur.spend).toFixed(2):0}x, 구매 ${mCur.conv}건
+- 카카오: 광고비 ${fmtWon(kCur.spend)}원, ROAS ${kCur.spend>0?(kCur.val/kCur.spend).toFixed(2):0}x, 구매 ${kCur.conv}건
+- 구글: 광고비 ${fmtWon(gCur.spend)}원, ROAS ${gCur.spend>0?(gCur.val/gCur.spend).toFixed(2):0}x, 구매 ${gCur.conv}건
 
 ■ 캠페인별 상세 (광고비 상위)
 ${campLines}
 
-위 데이터를 바탕으로 아래 형식으로 정확히 응답해주세요:
+아래 형식으로 정확히 응답해주세요:
 
 [요약]
-(전반적인 성과를 3줄 이내로 핵심만 간결하게)
+(수익성 중심으로 3줄 이내 핵심 요약. 공헌이익 흑자/적자 여부 반드시 포함)
 
 [액션]
-HIGH | (제목) | (구체적 실행 방법 1-2줄)
-HIGH | (제목) | (구체적 실행 방법 1-2줄)
-MID | (제목) | (구체적 실행 방법 1-2줄)
-MID | (제목) | (구체적 실행 방법 1-2줄)
-LOW | (제목) | (구체적 실행 방법 1-2줄)
-
-숫자 근거를 들어 구체적으로 작성해주세요.`;
+HIGH | (제목) | (구체적 실행 방법. 반드시 수치 근거 포함)
+HIGH | (제목) | (구체적 실행 방법. 반드시 수치 근거 포함)
+MID | (제목) | (구체적 실행 방법)
+MID | (제목) | (구체적 실행 방법)
+LOW | (제목) | (구체적 실행 방법)`;
 }
 
 async function runAI(){
@@ -1024,17 +1095,19 @@ function renderExtraKPI(){
   const totalImpr=allAds.reduce((s,r)=>s+cleanNum(r.impressions||0),0);
   const totalClick=allAds.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0);
 
-  const COGS_RATE = 0.20; // 원가율 20% 고정
+  const OY_COMMISSION = 0.50; // OY 수수료율 50%
+  const COGS_RATE     = 0.20; // 원가율 20%
   const cac=totalConv>0?totalSpend/totalConv:0;
   const revenuePerImpr=totalImpr>0?totalRev/totalImpr*1000:0;
   const clickToConv=totalClick>0?totalConv/totalClick*100:0;
 
-  // 공헌이익 계산 (원가율 20% 적용)
-  const grossProfit = totalRev * (1 - COGS_RATE);          // 매출총이익 = 매출 × 80%
-  const contribProfit = grossProfit - totalSpend;            // 공헌이익 = 매출총이익 - 광고비
-  const contribMarginRate = totalRev > 0 ? contribProfit / totalRev * 100 : 0; // 공헌이익률
-  // 기존 기여 마진율 (원가 미반영 버전)
-  const adOnlyMargin = totalRev > 0 ? (totalRev - totalSpend) / totalRev * 100 : 0;
+  // 공헌이익 계산 (OY 수수료 50% + 원가 20% 반영)
+  // 실수령액 = OY매출 × (1 - 수수료율) = OY매출 × 50%
+  const netRevenue    = totalRev * (1 - OY_COMMISSION);      // 수수료 차감 후 실수령액
+  const grossProfit   = netRevenue * (1 - COGS_RATE);        // 매출총이익 = 실수령액 × 80%
+  const contribProfit = grossProfit - totalSpend;             // 공헌이익 = 매출총이익 - 광고비
+  const contribMarginRate = totalRev > 0 ? contribProfit / totalRev * 100 : 0; // 공헌이익률 (OY매출 기준)
+  const adOnlyMargin  = netRevenue > 0 ? (netRevenue - totalSpend) / totalRev * 100 : 0;
 
   function ekpi(label,val,sub,color,extra){
     return`<div class="kpi-card" style="--accent-color:${color}">
@@ -1047,23 +1120,50 @@ function renderExtraKPI(){
     </div>`;
   }
 
+  // 추가 지표
+  const cvr = totalImpr>0 ? totalConv/totalImpr*100 : 0;         // 노출→구매 전환율
+  const clickCvr = totalClick>0 ? totalConv/totalClick*100 : 0;  // 클릭→구매 전환율 (CVR)
+  const cpm = totalImpr>0 ? totalSpend/totalImpr*1000 : 0;
+  const roas7d = totalSpend>0 ? totalAdVal/totalSpend : 0;
+
   grid.innerHTML=
     ekpi('공헌이익',
       totalRev>0 ? fmtWon(contribProfit)+'원' : '—',
-      '매출×80% - 광고비',
+      'OY매출×50%×80% − 광고비',
       contribProfit>=0?'#43e97b':'#ff6584',
-      totalRev>0?`원가율 20% 적용`:'')+
+      totalRev>0?`수수료50%+원가20% 차감 기준`:'')+
     ekpi('공헌이익률',
       totalRev>0 ? contribMarginRate.toFixed(1)+'%' : '—',
       '공헌이익 ÷ OY매출',
-      contribMarginRate>=30?'#43e97b':contribMarginRate>=10?'#f7971e':'#ff6584',
-      totalRev>0?`광고비만 제외 시 ${adOnlyMargin.toFixed(1)}%`:'')+
-    ekpi('CAC (고객획득비용)',cac>0?fmtWon(cac)+'원':'—','광고비 ÷ 전환수','#6c63ff')+
-    ekpi('노출→전환율',clickToConv>0?clickToConv.toFixed(3)+'%':'—','클릭수 대비 구매수','#f7971e')+
-    ekpi('노출당 매출',revenuePerImpr>0?fmtWon(revenuePerImpr)+'원':'—','OY매출 ÷ 1,000노출','#00c6ff')+
-    ekpi('광고기여 매출',totalAdVal>0?fmtWon(totalAdVal)+'원':'—','1d click 기준','#ff6584')+
-    ekpi('광고의존도',totalRev>0&&totalAdVal>0?(totalAdVal/totalRev*100).toFixed(1)+'%':'—','광고기여매출 ÷ OY매출','#a18cd1')+
-    ekpi('매출총이익',totalRev>0?fmtWon(grossProfit)+'원':'—','OY매출 × 80%','#a18cd1','원가율 20% 적용');
+      contribMarginRate>=20?'#43e97b':contribMarginRate>=5?'#f7971e':'#ff6584',
+      totalRev>0?`실수령액 기준 마진: ${(netRevenue>0?(contribProfit/netRevenue*100):0).toFixed(1)}%`:'')+
+    ekpi('실수령액 (수수료 차감)',
+      totalRev>0?fmtWon(netRevenue)+'원':'—',
+      'OY매출 × 50%',
+      '#6c63ff',
+      totalRev>0?`매출총이익: ${fmtWon(grossProfit)}원`:'')+
+    ekpi('CAC (고객획득비용)',
+      cac>0?fmtWon(cac)+'원':'—',
+      '총광고비 ÷ 전환수',
+      '#00c6ff')+
+    ekpi('CVR (클릭→구매)',
+      clickCvr>0?clickCvr.toFixed(2)+'%':'—',
+      '구매수 ÷ 클릭수',
+      '#f7971e',
+      cvr>0?`노출→구매: ${cvr.toFixed(4)}%`:'')+
+    ekpi('노출당 매출',
+      revenuePerImpr>0?fmtWon(revenuePerImpr)+'원':'—',
+      'OY매출 ÷ 1,000노출',
+      '#43e97b')+
+    ekpi('광고기여 매출 (1d)',
+      totalAdVal>0?fmtWon(totalAdVal)+'원':'—',
+      '1d click 전환 매출',
+      '#ff6584',
+      totalRev>0?`OY매출 대비 ${(totalAdVal/totalRev*100).toFixed(1)}%`:'')+
+    ekpi('ROAS (광고기여)',
+      roas7d>0?roas7d.toFixed(2)+'x':'—',
+      '광고기여매출 ÷ 광고비',
+      roas7d>=2?'#43e97b':roas7d>=1?'#f7971e':'#ff6584');
 }
 
 // ── 요일별 히트맵 ─────────────────────────────────────────────
