@@ -348,14 +348,26 @@ function normalizeDate(d){
   if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
   // YYYY/MM/DD
   if(/^\d{4}\/\d{2}\/\d{2}$/.test(d))return d.replace(/\//g,'-');
-  // 구글 시트 직렬 숫자 (예: 45000대)
+  // YYYY. MM. DD 또는 YYYY.MM.DD
+  const kr=d.match(/^(\d{4})[.\s]+(\d{1,2})[.\s]+(\d{1,2})/);
+  if(kr)return kr[1]+'-'+kr[2].padStart(2,'0')+'-'+kr[3].padStart(2,'0');
+  // MM/DD/YYYY 또는 M/D/YYYY (gviz CSV 미국식)
+  const us=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(us)return us[3]+'-'+us[1].padStart(2,'0')+'-'+us[2].padStart(2,'0');
+  // 구글 시트 직렬 숫자 (45000대) — 로컬 날짜 기준
   if(/^\d{5}$/.test(d)){
     const base=new Date(1899,11,30);
     base.setDate(base.getDate()+parseInt(d));
-    return base.toISOString().slice(0,10);
+    return base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
   }
-  // Date 파싱 시도
-  try{const p=new Date(d);if(!isNaN(p))return p.toISOString().slice(0,10);}catch(e){}
+  // Date(YYYY,M,D) gviz JSON 형식 (월 0-indexed)
+  const gviz=d.match(/^Date\((\d+),(\d+),(\d+)\)$/);
+  if(gviz)return gviz[1]+'-'+String(+gviz[2]+1).padStart(2,'0')+'-'+String(+gviz[3]).padStart(2,'0');
+  // 마지막 수단 — 로컬 날짜 파싱 (toISOString은 UTC라 하루 밀림)
+  try{
+    const p=new Date(d);
+    if(!isNaN(p))return p.getFullYear()+'-'+String(p.getMonth()+1).padStart(2,'0')+'-'+String(p.getDate()).padStart(2,'0');
+  }catch(e){}
   return d;
 }
 function getAllDates(){
@@ -516,7 +528,9 @@ async function loadAllData(){
     renderAll();
     document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
     const oyLast=getOYLatestDate();
-    setStatus(`✅ 로드 완료 · 광고: ${filterFrom}~${filterTo} · OY 최신: ${oyLast||'없음'} · 목표: ${allData.goals.length}행`,'success');
+    // Meta 날짜 원시값 샘플 (날짜 파싱 확인용)
+    const metaSample=allData.meta.slice(0,3).map(r=>r.partition_date).join(' | ');
+    setStatus(`✅ 로드 완료 · Meta날짜샘플: ${metaSample} · OY 최신: ${oyLast||'없음'} · 목표: ${allData.goals.length}행`,'success');
     // 데이터 로드 완료 후 AI 자동 분석 실행
     setTimeout(()=>{ runAI(); }, 800);
   }catch(e){setStatus('오류: '+e.message,'error');}
