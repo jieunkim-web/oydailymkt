@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>광고·매출 통합 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<style>
+:root{--bg:#f5f6fa;--bg2:#ffffff;--bg3:#f0f1f5;--border:rgba(0,0,0,0.08);--accent:#6c63ff;--accent2:#ff6584;--accent3:#1a9e5c;--accent4:#d97706;--text:#1a1a2e;--text2:#555577;--text3:#aaaacc;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(108,99,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(108,99,255,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+.wrap{position:relative;z-index:1;max-width:1440px;margin:0 auto;padding:28px 24px;}
+.header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;padding-bottom:20px;border-bottom:1px solid var(--border);gap:16px;flex-wrap:wrap;}
+.header-left h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;background:linear-gradient(135deg,#fff 0%,#8888cc 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.header-left p{font-size:12px;color:var(--text2);margin-top:4px;}
+.header-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.sheet-input-wrap{display:flex;gap:6px;align-items:center;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:5px 10px 5px 12px;}
+.sheet-input-wrap input{background:none;border:none;outline:none;color:var(--text);font-size:11px;font-family:monospace;width:240px;}
+.sheet-input-wrap input::placeholder{color:var(--text3);}
+.btn{padding:7px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#7c74ff;transform:translateY(-1px);}
+.btn-ghost{background:var(--bg3);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);border-color:var(--accent);}
+.btn-sm{padding:4px 11px;font-size:11px;}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+/* 필터바 */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;padding:11px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;}
+.filter-label{font-size:11px;color:var(--text2);white-space:nowrap;}
+.date-range-btns{display:flex;gap:3px;background:var(--bg3);border-radius:7px;padding:3px;}
+.range-btn{padding:4px 11px;font-size:11px;font-weight:500;border:none;border-radius:5px;cursor:pointer;background:none;color:var(--text2);font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;transition:all 0.15s;white-space:nowrap;}
+.range-btn.active{background:var(--accent);color:#fff;}
+.date-inputs{display:flex;align-items:center;gap:5px;}
+.date-inputs input[type=date]{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;padding:4px 8px;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;outline:none;}
+.date-sep{font-size:11px;color:var(--text3);}
+.filter-divider{width:1px;height:18px;background:var(--border);flex-shrink:0;}
+.product-select{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;padding:4px 10px;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;outline:none;cursor:pointer;min-width:140px;}
+#date-display{font-size:11px;color:var(--text3);}
+#filter-summary{font-size:10px;color:var(--text3);}
+
+/* 상태바 */
+.status-bar{display:none;align-items:center;gap:8px;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;font-size:12px;color:var(--text2);}
+.status-bar.show{display:flex;}
+.status-dot{width:7px;height:7px;border-radius:50%;animation:pulse 1.5s infinite;}
+.status-dot.loading{background:var(--accent4);}
+.status-dot.error{background:var(--accent2);animation:none;}
+.status-dot.success{background:var(--accent3);animation:none;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;}
+.kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;overflow:hidden;transition:border-color 0.2s;}
+.kpi-card:hover{border-color:rgba(108,99,255,0.3);}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent-color,var(--accent));}
+.kpi-label{font-size:11px;color:var(--text2);margin-bottom:8px;}
+.kpi-value{font-size:22px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;}
+.kpi-compare{margin-top:10px;padding-top:8px;border-top:1px solid var(--border);}
+.kpi-compare-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;}
+.kpi-compare-label{font-size:10px;color:var(--text3);}
+.kpi-compare-val{font-size:11px;font-weight:500;color:var(--text2);}
+.kpi-delta{font-size:11px;margin-top:2px;}
+.delta-up{color:var(--accent3);}
+.delta-down{color:var(--accent2);}
+.delta-neutral{color:var(--text3);}
+
+/* 차트 */
+.charts-grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px;}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:3px;}
+.chart-sub{font-size:11px;color:var(--text2);margin-bottom:12px;}
+.chart-wrap{position:relative;height:210px;}
+
+/* 테이블 */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.section-title{font-size:14px;font-weight:600;}
+.tabs{display:flex;gap:3px;background:var(--bg3);border-radius:8px;padding:3px;}
+.tab-btn{padding:4px 13px;font-size:12px;font-weight:500;border:none;border-radius:6px;cursor:pointer;background:none;color:var(--text2);font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;transition:all 0.15s;}
+.tab-btn.active{background:var(--accent);color:#fff;}
+.table-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px;}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+thead tr{background:var(--bg3);}
+th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap;border-bottom:1px solid var(--border);}
+td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text);white-space:nowrap;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(108,99,255,0.04);}
+.badge{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
+.badge-good{background:rgba(67,233,123,0.15);color:#43e97b;}
+.badge-warn{background:rgba(247,151,30,0.15);color:#f7971e;}
+.badge-bad{background:rgba(255,101,132,0.15);color:#ff6584;}
+
+/* AI */
+.ai-typing::after{content:'▋';animation:blink-cursor 0.7s infinite;font-size:14px;color:var(--accent);}
+@keyframes blink-cursor{0%,100%{opacity:1}50%{opacity:0}}
+.ai-summary{background:linear-gradient(135deg,rgba(108,99,255,0.06),rgba(255,101,132,0.04));border:1px solid rgba(108,99,255,0.15);border-radius:10px;padding:14px 16px;font-size:13px;color:var(--text);line-height:1.8;margin-bottom:12px;white-space:pre-wrap;}
+.ai-skeleton{height:16px;background:linear-gradient(90deg,var(--bg3) 25%,var(--border) 50%,var(--bg3) 75%);background-size:200% 100%;animation:shimmer 1.2s infinite;border-radius:6px;margin-bottom:8px;}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.ai-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;}
+.ai-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.ai-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;}
+.ai-icon{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:13px;}
+.ai-content{font-size:13px;color:var(--text2);line-height:1.8;min-height:40px;white-space:pre-wrap;}
+.action-list{list-style:none;display:flex;flex-direction:column;gap:8px;margin-top:12px;}
+.action-item{display:flex;gap:10px;padding:10px 14px;background:var(--bg3);border-radius:8px;border-left:3px solid;font-size:13px;line-height:1.6;}
+.action-high{border-left-color:var(--accent2);}
+.action-mid{border-left-color:var(--accent4);}
+.action-low{border-left-color:var(--accent3);}
+.action-tag{font-size:10px;font-weight:700;white-space:nowrap;padding-top:2px;opacity:0.8;}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text3);}
+.empty-state .icon{font-size:32px;margin-bottom:8px;}
+.empty-state p{font-size:13px;line-height:1.7;}
+
+/* 목표 달성률 배너 */
+.goal-banner{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:16px;display:none;}
+.goal-banner.show{display:block;}
+.goal-banner-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;}
+.goal-banner-title{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;}
+.goal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;}
+.goal-item{background:var(--bg3);border-radius:10px;padding:12px 14px;}
+.goal-item-label{font-size:10px;color:var(--text2);margin-bottom:6px;font-weight:500;}
+.goal-bar-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:6px;}
+.goal-bar-fill{height:100%;border-radius:3px;transition:width 0.6s ease;}
+.goal-nums{display:flex;justify-content:space-between;font-size:11px;}
+.goal-current{font-weight:700;}
+.goal-target{color:var(--text3);}
+.goal-pct{font-size:13px;font-weight:700;margin-left:auto;}
+.goal-inputs{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.goal-input{background:var(--bg3);border:1px solid var(--border);border-radius:7px;color:var(--text);font-size:11px;padding:5px 9px;width:130px;font-family:inherit;outline:none;}
+.goal-input:focus{border-color:var(--accent);}
+/* 추가 KPI */
+.kpi-grid-extra{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px;margin-bottom:16px;}
+/* 히트맵 */
+.heatmap-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+.heatmap-grid{display:grid;grid-template-columns:auto repeat(7,1fr);gap:3px;font-size:10px;}
+.heatmap-label{color:var(--text3);padding:4px 6px;display:flex;align-items:center;}
+.heatmap-cell{height:32px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;cursor:default;transition:transform 0.1s;}
+.heatmap-cell:hover{transform:scale(1.08);z-index:1;position:relative;}
+.heatmap-day-header{text-align:center;padding:4px;color:var(--text3);font-weight:600;}
+/* 예산 배분 제안 */
+.budget-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:16px;}
+.budget-row{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.budget-ch{font-size:12px;font-weight:500;width:64px;flex-shrink:0;}
+.budget-bar-wrap{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative;}
+.budget-bar-cur{height:100%;border-radius:4px;opacity:0.4;position:absolute;top:0;left:0;}
+.budget-bar-opt{height:100%;border-radius:4px;position:absolute;top:0;left:0;}
+.budget-pcts{font-size:11px;color:var(--text2);white-space:nowrap;min-width:80px;}
+.budget-arrow{font-size:11px;min-width:60px;}
+@media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.charts-grid{grid-template-columns:1fr;}}
+@media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.header{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="header">
+  <div class="header-left">
+    <h1>광고 · 매출 통합 대시보드</h1>
+    <p id="last-updated">구글 시트 ID를 입력하고 데이터를 불러오세요</p>
+  </div>
+  <div class="header-right">
+    <div class="sheet-input-wrap">
+      <span style="font-size:10px;color:var(--text3);white-space:nowrap;">Sheet ID</span>
+      <input type="text" id="sheet-id" value="11KGExx7r0wpaKipWqeDZ0K9jmoealwv90FHLSzP6BS0">
+    </div>
+    <button class="btn btn-primary" id="load-btn" onclick="loadAllData()">데이터 불러오기</button>
+  </div>
+</div>
+
+<div class="filter-bar">
+  <span class="filter-label">기간</span>
+  <div class="date-range-btns">
+    <button class="range-btn" onclick="setRange(1,this)">전일</button>
+    <button class="range-btn active" onclick="setRange(7,this)">7일</button>
+    <button class="range-btn" onclick="setRange(14,this)">14일</button>
+    <button class="range-btn" onclick="setRange(30,this)">30일</button>
+    <button class="range-btn" onclick="setRange(0,this)">직접입력</button>
+  </div>
+  <div class="date-inputs" id="custom-inputs" style="display:none;">
+    <input type="date" id="date-from">
+    <span class="date-sep">~</span>
+    <input type="date" id="date-to">
+    <button class="btn btn-ghost btn-sm" onclick="applyCustomRange()">적용</button>
+  </div>
+  <span id="date-display"></span>
+  <div class="filter-divider"></div>
+  <span class="filter-label">제품</span>
+  <select class="product-select" id="product-filter" onchange="onProductChange()">
+    <option value="all">전체 제품</option>
+  </select>
+  <span id="filter-summary"></span>
+</div>
+
+<div class="status-bar" id="status-bar">
+  <div class="status-dot loading" id="status-dot"></div>
+  <span id="status-text"></span>
+</div>
+
+<!-- 목표 달성률 배너 -->
+<div class="goal-banner show" id="goal-banner">
+  <div class="goal-banner-top">
+    <div class="goal-banner-title">🎯 월별 목표 달성률</div>
+    <span style="font-size:11px;color:var(--text3)" id="goal-month-label">데이터를 불러오면 해당 월 목표가 표시됩니다</span>
+  </div>
+  <div class="goal-grid" id="goal-grid">
+    <div style="font-size:12px;color:var(--text3);padding:8px 0">데이터를 불러오면 달성률이 표시됩니다.</div>
+  </div>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card" style="--accent-color:#6c63ff"><div class="kpi-label">총 광고비 (전일)</div><div class="kpi-value" id="kpi-spend">—</div><div class="kpi-compare" id="kpi-spend-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#43e97b"><div class="kpi-label" id="oy-kpi-label">OY 매출 (최신일)</div><div class="kpi-value" id="kpi-revenue">—</div><div class="kpi-compare" id="kpi-revenue-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#f7971e"><div class="kpi-label">ROAS 1d (전일)</div><div class="kpi-value" id="kpi-roas">—</div><div class="kpi-compare" id="kpi-roas-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#ff6584"><div class="kpi-label">구매수 1d (전일)</div><div class="kpi-value" id="kpi-purchases">—</div><div class="kpi-compare" id="kpi-purchases-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#00c6ff"><div class="kpi-label">CTR 평균 (전일)</div><div class="kpi-value" id="kpi-ctr">—</div><div class="kpi-compare" id="kpi-ctr-cmp"></div></div>
+  <div class="kpi-card" style="--accent-color:#a18cd1"><div class="kpi-label">광고비/매출 (전일)</div><div class="kpi-value" id="kpi-ratio">—</div><div class="kpi-compare" id="kpi-ratio-cmp"></div></div>
+</div>
+
+<!-- 추가 지표 카드 -->
+<div class="kpi-grid-extra" id="extra-kpi-grid" style="display:none"></div>
+
+<div class="charts-grid">
+  <div class="chart-card">
+    <div class="chart-title">매출 vs 광고비 추세</div>
+    <div class="chart-sub" id="trend-sub">일별 OY 매출 · Meta · 카카오 · 구글 광고비</div>
+    <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title">채널별 광고비 비중</div>
+    <div class="chart-sub" id="channel-sub">선택 기간 기준</div>
+    <div class="chart-wrap"><canvas id="channel-chart"></canvas></div>
+  </div>
+</div>
+
+<div class="section-header">
+  <div class="section-title">성과 분석 <span id="camp-date-lbl" style="font-size:11px;color:var(--text2);font-weight:400;margin-left:6px;"></span></div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('meta')">Meta</button>
+    <button class="tab-btn" onclick="switchTab('kakao')">카카오</button>
+    <button class="tab-btn" onclick="switchTab('google')">구글</button>
+    <button class="tab-btn" onclick="switchTab('product')">제품별 매출</button>
+  </div>
+</div>
+<div class="table-card">
+  <div class="table-wrap">
+    <table>
+      <thead id="main-thead"><tr><th>캠페인</th><th>광고세트</th><th>지출</th><th>ROAS 1d</th><th>구매 1d</th><th>CVR</th><th>CTR</th><th>CPM</th><th>상태</th></tr></thead>
+      <tbody id="main-tbody"><tr><td colspan="8"><div class="empty-state"><div class="icon">📊</div><p>데이터를 불러오면 표시돼요</p></div></td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- 요일별 성과 히트맵 -->
+<div class="heatmap-card" id="heatmap-card" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+    <div>
+      <div class="chart-title">요일별 성과 히트맵</div>
+      <div class="chart-sub">진할수록 ROAS 높음 — 최근 8주 기준</div>
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn active" onclick="setHeatmapMetric('roas',this)">ROAS</button>
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn" onclick="setHeatmapMetric('spend',this)">광고비</button>
+      <button class="btn btn-ghost btn-sm heatmap-metric-btn" onclick="setHeatmapMetric('revenue',this)">매출</button>
+    </div>
+  </div>
+  <div class="heatmap-grid" id="heatmap-grid"></div>
+  <div style="display:flex;gap:16px;margin-top:12px;font-size:10px;color:var(--text3);flex-wrap:wrap" id="heatmap-insight"></div>
+</div>
+
+<!-- 매체별 예산 배분 제안 -->
+<div class="budget-card" id="budget-card" style="display:none">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+    <div>
+      <div class="chart-title">📊 매체별 예산 배분 제안</div>
+      <div class="chart-sub">최근 30일 ROAS 기반 최적 배분 vs 현재 배분</div>
+    </div>
+    <div style="display:flex;gap:4px;font-size:10px;color:var(--text3);align-items:center">
+      <span style="width:10px;height:10px;background:var(--accent);opacity:0.4;display:inline-block;border-radius:2px"></span>현재
+      <span style="width:10px;height:10px;background:var(--accent);display:inline-block;border-radius:2px;margin-left:6px"></span>제안
+    </div>
+  </div>
+  <div id="budget-rows"></div>
+  <div id="budget-summary" style="margin-top:14px;padding:12px 14px;background:var(--bg3);border-radius:8px;font-size:12px;color:var(--text2);line-height:1.7"></div>
+</div>
+
+<div class="ai-card">
+  <div class="ai-header">
+    <div class="ai-title"><div class="ai-icon">✦</div>AI 성과 분석 & 개선 액션</div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="ai-status" style="font-size:11px;color:var(--text3);display:none"></span>
+      <button class="btn btn-ghost" id="ai-btn" onclick="runAI()">분석 요청 ↗</button>
+    </div>
+  </div>
+  <div id="ai-result-wrap">
+    <div class="ai-content" id="ai-content">데이터를 불러온 후 "분석 요청" 버튼을 누르면 현재 화면 데이터를 바탕으로 Claude가 분석해드려요.</div>
+    <ul class="action-list" id="action-list"></ul>
+  </div>
+</div>
+
+</div>
+<script>
+const SHEET_ID=()=>document.getElementById('sheet-id').value.trim();
+let allData={meta:[],kakao:[],google:[],oy:[],goals:[]};
+let currentTab='meta',trendChart,channelChart;
+let filterFrom='',filterTo='',selectedProduct='all';
+
+function cleanNum(v){if(!v&&v!==0)return 0;const n=parseFloat(String(v).replace(/[₩,\s%]/g,'').trim());return isNaN(n)?0:n;}
+function fmtWon(n){n=Math.round(n);if(n>=100000000)return(n/100000000).toFixed(1)+'억';if(n>=10000)return Math.round(n/10000)+'만';return n.toLocaleString();}
+function fmtNum(n){return Math.round(n).toLocaleString();}
+function setStatus(msg,type){document.getElementById('status-bar').classList.add('show');document.getElementById('status-text').textContent=msg;document.getElementById('status-dot').className='status-dot '+type;}
+function hideStatus(){document.getElementById('status-bar').classList.remove('show');}
+
+// CSV 파싱 — headerRow: 몇 번째 줄이 헤더인지 (1-indexed)
+async function fetchSheet(name,headerRow){
+  const gidMap={'메타':'724559574','카카오':'426543347','구글':'1538188926','OY온라인':'164965270','목표':'1577536095'};
+  const gid=gidMap[name];
+  const url=gid!==undefined
+    ? `https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&gid=${gid}`
+    : `https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+  const r=await fetch(url);
+  if(!r.ok)throw new Error(`${name} 접근 실패 (HTTP ${r.status})`);
+  return parseCSV(await r.text(),headerRow||1);
+}
+function parseCSV(text,hRow){
+  const lines=text.trim().split('\n');
+  if(lines.length<hRow+1)return[];
+  const headers=splitLine(lines[hRow-1]).map(h=>h.replace(/"/g,'').trim().toLowerCase().replace(/\s+/g,'_'));
+  return lines.slice(hRow).map(line=>{
+    const cells=splitLine(line);
+    const obj={};
+    headers.forEach((h,i)=>{obj[h]=(cells[i]||'').replace(/"/g,'').trim();});
+    return obj;
+  }).filter(r=>Object.values(r).some(v=>v&&v!=='#N/A'&&v!=='#REF!'&&v!=='#VALUE!'&&v!=='#ERROR!'));
+}
+function splitLine(line){
+  const r=[];let c='',q=false;
+  for(let i=0;i<line.length;i++){if(line[i]==='"'){q=!q;continue;}if(line[i]===','&&!q){r.push(c);c='';continue;}c+=line[i];}
+  r.push(c);return r;
+}
+
+// 날짜 — 어떤 형식이든 YYYY-MM-DD로 정규화
+function normalizeDate(d){
+  if(!d)return'';
+  d=String(d).trim();
+  // 이미 YYYY-MM-DD
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+  // YYYY/MM/DD
+  if(/^\d{4}\/\d{2}\/\d{2}$/.test(d))return d.replace(/\//g,'-');
+  // YYYY. MM. DD 또는 YYYY.MM.DD
+  const kr=d.match(/^(\d{4})[.\s]+(\d{1,2})[.\s]+(\d{1,2})/);
+  if(kr)return kr[1]+'-'+kr[2].padStart(2,'0')+'-'+kr[3].padStart(2,'0');
+  // MM/DD/YYYY 또는 M/D/YYYY (gviz CSV 미국식)
+  const us=d.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(us)return us[3]+'-'+us[1].padStart(2,'0')+'-'+us[2].padStart(2,'0');
+  // 구글 시트 직렬 숫자 (45000대) — 로컬 날짜 기준
+  if(/^\d{5}$/.test(d)){
+    const base=new Date(1899,11,30);
+    base.setDate(base.getDate()+parseInt(d));
+    return base.getFullYear()+'-'+String(base.getMonth()+1).padStart(2,'0')+'-'+String(base.getDate()).padStart(2,'0');
+  }
+  // Date(YYYY,M,D) gviz JSON 형식 (월 0-indexed)
+  const gviz=d.match(/^Date\((\d+),(\d+),(\d+)\)$/);
+  if(gviz)return gviz[1]+'-'+String(+gviz[2]+1).padStart(2,'0')+'-'+String(+gviz[3]).padStart(2,'0');
+  // 마지막 수단 — 로컬 날짜 파싱 (toISOString은 UTC라 하루 밀림)
+  try{
+    const p=new Date(d);
+    if(!isNaN(p))return p.getFullYear()+'-'+String(p.getMonth()+1).padStart(2,'0')+'-'+String(p.getDate()).padStart(2,'0');
+  }catch(e){}
+  return d;
+}
+function getAllDates(){
+  // 광고 데이터 날짜
+  const adDates=[...allData.meta,...allData.kakao,...allData.google]
+    .map(r=>normalizeDate(r.partition_date||''))
+    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d));
+  return[...new Set(adDates)].sort();
+}
+function getOYLatestDate(){
+  // OY는 별도 최신 날짜 (광고보다 하루 늦을 수 있음)
+  const oyDates=allData.oy
+    .map(r=>normalizeDate(r.partition_date||''))
+    .filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d));
+  if(!oyDates.length)return '';
+  return oyDates.sort()[oyDates.length-1];
+}
+function getLatestDate(){return filterTo;}
+function filterRows(rows,dateKey){
+  dateKey=dateKey||'partition_date';
+  let out=rows.filter(r=>{
+    const raw=r[dateKey]||'';
+    if(!raw||raw==='#N/A'||raw==='#REF!'||raw==='#VALUE!')return false;
+    const d=normalizeDate(raw);
+    return d>=filterFrom&&d<=filterTo;
+  });
+  if(selectedProduct!=='all')out=out.filter(r=>(r.product_name||'')===selectedProduct);
+  return out;
+}
+function getPrev7(rows,dateKey){
+  dateKey=dateKey||'partition_date';
+  const dates=getAllDates();
+  let idx=dates.indexOf(filterFrom);
+  if(idx<0)idx=dates.filter(d=>d<filterFrom).length;
+  if(idx<=0)return[];
+  const prev=dates.slice(Math.max(0,idx-7),idx);
+  let out=rows.filter(r=>prev.includes(normalizeDate(r[dateKey]||'')));
+  if(selectedProduct!=='all')out=out.filter(r=>(r.product_name||'')===selectedProduct);
+  return out;
+}
+
+// 날짜 필터 UI
+function setRange(days,btn){
+  document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  document.getElementById('custom-inputs').style.display=days===0?'flex':'none';
+  if(days===0||!allData.meta.length){updateDateDisplay();return;}
+  const dates=getAllDates();if(!dates.length)return;
+  const adLatest=dates[dates.length-1];
+  const oyLast=getOYLatestDate();
+  // filterTo = 광고 최신일 vs OY 최신일 중 더 최신
+  filterTo = oyLast&&oyLast>adLatest ? oyLast : adLatest;
+  filterFrom=days===1?adLatest:dates[Math.max(0,dates.length-days)];
+  updateDateDisplay();renderAll();
+}
+function applyCustomRange(){
+  filterFrom=document.getElementById('date-from').value;
+  filterTo=document.getElementById('date-to').value;
+  if(!filterFrom||!filterTo){alert('날짜를 선택해주세요');return;}
+  updateDateDisplay();renderAll();
+}
+function updateDateDisplay(){
+  document.getElementById('date-display').textContent=filterFrom===filterTo?filterFrom:filterFrom+' ~ '+filterTo;
+}
+
+// 제품 필터
+function buildProductFilter(){
+  const prods=new Set([...allData.meta,...allData.oy].map(r=>r.product_name||'').filter(Boolean));
+  const sel=document.getElementById('product-filter');
+  // 현재 선택값 기억
+  const prev=selectedProduct;
+  sel.innerHTML='<option value="all">전체 제품</option>';
+  [...prods].sort().forEach(p=>{const o=document.createElement('option');o.value=p;o.textContent=p;sel.appendChild(o);});
+  // 이전 선택값 복원 (존재하면)
+  if(prev!=='all'&&prods.has(prev)){sel.value=prev;selectedProduct=prev;}
+  else{sel.value='all';selectedProduct='all';}
+}
+function onProductChange(){selectedProduct=document.getElementById('product-filter').value;renderAll();}
+
+// 데이터 로드
+async function loadAllData(){
+  const btn=document.getElementById('load-btn');
+  btn.disabled=true;btn.textContent='불러오는 중...';
+  setStatus('구글 시트 연결 중...','loading');
+  try{
+    setStatus('Meta 로딩...','loading');
+    allData.meta=await fetchSheet('메타',1);
+    setStatus('카카오 로딩...','loading');
+    try{allData.kakao=await fetchSheet('카카오',1);}catch(e){allData.kakao=[];}
+    setStatus('구글 로딩...','loading');
+    try{allData.google=await fetchSheet('구글',1);}catch(e){allData.google=[];}
+    setStatus('목표 로딩...','loading');
+    try{
+      const goalsRaw=await fetchSheet('목표',1);
+      allData.goals=goalsRaw.map(r=>({
+        yearmonth:   String(r.yearmonth||r['yearmonth']||'').trim(),
+        product:     String(r.product_name||r['제품명']||'전체').trim(),
+        goalRevenue: parseFloat(String(r.goal_revenue||r['목표매출']||0).replace(/,/g,''))||0,
+        goalSpend:   parseFloat(String(r.goal_spend||r['목표광고비']||0).replace(/,/g,''))||0,
+        goalRoas:    parseFloat(String(r.goal_roas||r['목표roas']||r['목표ROAS']||0))||0,
+      })).filter(r=>r.yearmonth);
+      console.log('목표 로드:', allData.goals.length, '행', allData.goals.slice(0,2));
+    }catch(e){allData.goals=[];console.log('목표 시트 없음:', e.message);}
+    setStatus('올리브영 매출 로딩...','loading');
+    try{
+      const oyGid='164965270';
+      // JSON 방식으로 변경 — CSV 인코딩/파싱 문제 회피
+      const oyUrl=`https://docs.google.com/spreadsheets/d/${SHEET_ID()}/gviz/tq?tqx=out:json&gid=${oyGid}`;
+      const oyResp=await fetch(oyUrl);
+      const oyText=await oyResp.text();
+      // gviz JSON은 앞에 쓸모없는 텍스트가 붙어서 제거
+      const oyJson=JSON.parse(oyText.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
+      const oyCols=oyJson.table.cols;
+      const oyRows=oyJson.table.rows;
+      // 2행 헤더: cols에서 컬럼명 가져오기 (label 우선, id 차선)
+      // actual_revenue, yearmonth, product_name, partition_date, 라인, (빈칸), Day, 판매량
+      const oyHeaders=['actual_revenue','yearmonth','product_name','partition_date','라인','','day','판매량'];
+      allData.oy=oyRows.map(row=>{
+        const obj={};
+        oyHeaders.forEach((h,i)=>{
+          if(!h)return;
+          const cell=row.c&&row.c[i];
+          if(!cell||cell.v===null||cell.v===undefined){obj[h]='';return;}
+          // gviz Date 형식: "Date(2026,3,26)" → 월은 0-indexed
+          if(typeof cell.v==='string'&&cell.v.startsWith('Date(')){
+            const m=cell.v.match(/Date\((\d+),(\d+),(\d+)\)/);
+            if(m){
+              const yr=m[1], mo=String(+m[2]+1).padStart(2,'0'), dy=String(+m[3]).padStart(2,'0');
+              obj[h]=`${yr}-${mo}-${dy}`;
+            }else obj[h]=cell.v;
+          }else if(cell.f&&h==='partition_date'){
+            // formatted value 우선 사용 (YYYY-MM-DD 형식이면)
+            const fmt=String(cell.f).trim();
+            if(/^\d{4}-\d{2}-\d{2}$/.test(fmt))obj[h]=fmt;
+            else obj[h]=String(cell.v);
+          }else{
+            obj[h]=String(cell.v);
+          }
+        });
+        return obj;
+      }).filter(r=>r.actual_revenue&&r.partition_date&&r.partition_date!=='null'&&/^\d{4}-\d{2}-\d{2}$/.test(r.partition_date));
+    }catch(e){allData.oy=[];console.error('OY오류:',e);}
+
+    const dates=getAllDates();
+    if(!dates.length){
+      const sample=allData.meta.slice(0,1).map(r=>JSON.stringify(r)).join('');
+      setStatus('날짜 인식 실패. 샘플: '+sample,'error');
+      btn.disabled=false;btn.textContent='데이터 불러오기';
+      return;
+    }
+    // filterTo = 광고 최신일과 OY 최신일 중 더 최신값
+    const adLatest  = dates[dates.length-1];
+    const oyLatest2 = getOYLatestDate();
+    filterTo   = oyLatest2 && oyLatest2>adLatest ? oyLatest2 : adLatest;
+    filterFrom = dates[Math.max(0,dates.length-7)];
+    updateDateDisplay();
+    buildProductFilter();
+    renderAll();
+    document.getElementById('last-updated').textContent='업데이트: '+new Date().toLocaleString('ko-KR');
+    const oyLast=getOYLatestDate();
+    // Meta 날짜 원시값 샘플 (날짜 파싱 확인용)
+    const metaSample=allData.meta.slice(0,3).map(r=>r.partition_date).join(' | ');
+    setStatus(`✅ 로드 완료 · Meta날짜샘플: ${metaSample} · OY 최신: ${oyLast||'없음'} · 목표: ${allData.goals.length}행`,'success');
+    // 데이터 로드 완료 후 AI 자동 분석 실행
+    setTimeout(()=>{ runAI(); }, 800);
+  }catch(e){setStatus('오류: '+e.message,'error');}
+  btn.disabled=false;btn.textContent='데이터 불러오기';
+}
+
+// KPI
+function renderKPI(){
+  const latest=getLatestDate();if(!latest)return;
+  // partition_date를 정규화해서 비교
+  let ydM=allData.meta.filter(r=>normalizeDate(r.partition_date||'')===latest);
+  if(selectedProduct!=='all')ydM=ydM.filter(r=>r.product_name===selectedProduct);
+  let p7M=getPrev7(allData.meta);
+  const p7Days=new Set(p7M.map(r=>r.partition_date)).size||1;
+
+  const ydSpend=ydM.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const ydV7d=ydM.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click),0);
+  const ydP7d=ydM.reduce((s,r)=>s+cleanNum(r.purchases_1d_click),0);
+  const ydImpr=ydM.reduce((s,r)=>s+cleanNum(r.impressions),0);
+  const ydClk=ydM.reduce((s,r)=>s+cleanNum(r.outbound_clicks),0);
+  const ydRoas=ydSpend>0?ydV7d/ydSpend:0;
+  const ydCtr=ydImpr>0?ydClk/ydImpr*100:0;
+
+  const p7Spend=p7M.reduce((s,r)=>s+cleanNum(r.spend),0)/p7Days;
+  const p7V7d=p7M.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click),0)/p7Days;
+  const p7P7d=p7M.reduce((s,r)=>s+cleanNum(r.purchases_1d_click),0)/p7Days;
+  const p7Impr=p7M.reduce((s,r)=>s+cleanNum(r.impressions),0)/p7Days;
+  const p7Clk=p7M.reduce((s,r)=>s+cleanNum(r.outbound_clicks),0)/p7Days;
+  const p7Roas=p7Spend>0?p7V7d/p7Spend:0;
+  const p7Ctr=p7Impr>0?p7Clk/p7Impr*100:0;
+
+  // OY — OY 자체 최신 날짜 기준 (Meta latest와 독립)
+  const oyLatest=getOYLatestDate()||latest;
+  document.getElementById('oy-kpi-label').textContent='OY 매출 ('+oyLatest+')';
+  let ydOY=allData.oy.filter(r=>normalizeDate(r.partition_date||'')===oyLatest);
+  if(selectedProduct!=='all')ydOY=ydOY.filter(r=>r.product_name===selectedProduct);
+  const ydRev=ydOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  // OY 직전 7일 비교
+  const oyAllDates=[...new Set(allData.oy.map(r=>normalizeDate(r.partition_date||'')).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)))].sort();
+  const oyLatestIdx=oyAllDates.indexOf(oyLatest);
+  const oyPrev7Dates=oyLatestIdx>0?oyAllDates.slice(Math.max(0,oyLatestIdx-7),oyLatestIdx):[];
+  let p7OY=allData.oy.filter(r=>oyPrev7Dates.includes(normalizeDate(r.partition_date||'')));
+  if(selectedProduct!=='all')p7OY=p7OY.filter(r=>r.product_name===selectedProduct);
+  const p7OYDays=new Set(p7OY.map(r=>normalizeDate(r.partition_date||''))).size||1;
+  const p7Rev=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
+
+  const ydRatio=ydRev>0?ydSpend/ydRev*100:0;
+  const p7Ratio=p7Rev>0?p7Spend/p7Rev*100:0;
+
+  setKPI('kpi-spend',    fmtWon(ydSpend)+'원',        ydSpend, p7Spend, '원');
+  setKPI('kpi-revenue',  ydRev>0?fmtWon(ydRev)+'원':'—', ydRev, p7Rev, '원');
+  setKPI('kpi-roas',     ydRoas.toFixed(2)+'x',        ydRoas, p7Roas, 'x');
+  setKPI('kpi-purchases',fmtNum(ydP7d)+'건',           ydP7d,  p7P7d,  '건');
+  setKPI('kpi-ctr',      ydCtr.toFixed(2)+'%',         ydCtr,  p7Ctr,  '%');
+  setKPI('kpi-ratio',    ydRatio>0?ydRatio.toFixed(1)+'%':'—', ydRatio, p7Ratio, '%');
+
+  document.getElementById('filter-summary').textContent='';
+  const oyLbl=document.getElementById('oy-kpi-label');
+  if(oyLbl)oyLbl.textContent='OY 매출 ('+oyLatest+')';
+}
+
+function setKPI(id,val,cur,p7,unit){
+  document.getElementById(id).textContent=val;
+  const el=document.getElementById(id+'-cmp');if(!el)return;
+  let dHtml='';
+  if(p7>0){const pct=(cur-p7)/p7*100;const cls=pct>0?'delta-up':pct<0?'delta-down':'delta-neutral';dHtml=`<div class="kpi-delta ${cls}">${pct>0?'▲ +':'▼ '}${pct.toFixed(1)}% vs 직전7일 평균</div>`;}
+  const p7t=unit==='원'?fmtWon(p7)+unit:p7>0?p7.toFixed(unit==='x'||unit==='%'?2:0)+unit:'—';
+  el.innerHTML=`<div class="kpi-compare-row"><span class="kpi-compare-label">직전 7일 일평균</span><span class="kpi-compare-val">${p7t}</span></div>${dHtml}`;
+}
+
+// 추세 차트
+function renderTrendChart(){
+  const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
+  // OY는 filterFrom~filterTo 범위 내 데이터 (OY 최신일 포함)
+  const fOY=allData.oy.filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    return d>=filterFrom&&d<=filterTo&&(selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
+  // 날짜 = 광고 날짜 + OY 날짜 합집합 (OY 4/26도 포함)
+  const adDates=[...fM,...fK,...fG].map(r=>normalizeDate(r.partition_date||''));
+  const oyDates=fOY.map(r=>normalizeDate(r.partition_date||''));
+  const dates=[...new Set([...adDates,...oyDates])].filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  if(!dates.length)return;
+  const mD={},kD={},gD={},oyD={};
+  dates.forEach(d=>{mD[d]=0;kD[d]=0;gD[d]=0;oyD[d]=0;});
+  fM.forEach(r=>{const d=normalizeDate(r.partition_date||'');if(mD[d]!==undefined)mD[d]+=cleanNum(r.spend);});
+  fK.forEach(r=>{const d=normalizeDate(r.partition_date||'');if(kD[d]!==undefined)kD[d]+=cleanNum(r.spend);});
+  fG.forEach(r=>{const d=normalizeDate(r.partition_date||'');if(gD[d]!==undefined)gD[d]+=cleanNum(r.spend);});
+  fOY.forEach(r=>{const d=normalizeDate(r.partition_date||'');if(d&&oyD[d]!==undefined)oyD[d]+=cleanNum(r.actual_revenue);});
+  document.getElementById('trend-sub').textContent=filterFrom+' ~ '+filterTo+(selectedProduct!=='all'?' · '+selectedProduct:'');
+  const ctx=document.getElementById('trend-chart').getContext('2d');
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(ctx,{data:{labels:dates.map(d=>d.slice(5)),datasets:[
+    {type:'bar',label:'OY 매출',data:dates.map(d=>oyD[d]),backgroundColor:'rgba(67,233,123,0.12)',borderColor:'rgba(67,233,123,0.4)',borderWidth:1,yAxisID:'y2',order:2},
+    {type:'line',label:'Meta',data:dates.map(d=>mD[d]),borderColor:'#6c63ff',backgroundColor:'rgba(108,99,255,0.08)',borderWidth:2,pointRadius:3,fill:true,tension:0.4,yAxisID:'y1',order:1},
+    {type:'line',label:'카카오',data:dates.map(d=>kD[d]),borderColor:'#f7971e',borderWidth:2,pointRadius:3,tension:0.4,yAxisID:'y1',order:1},
+    {type:'line',label:'구글',data:dates.map(d=>gD[d]),borderColor:'#00c6ff',borderWidth:2,pointRadius:3,tension:0.4,yAxisID:'y1',order:1},
+  ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{color:'#555577',font:{size:11},boxWidth:12}},tooltip:{backgroundColor:'#ffffff',titleColor:'#1a1a2e',bodyColor:'#555577',borderColor:'#ddd',borderWidth:1,callbacks:{label:c=>` ${c.dataset.label}: ${fmtWon(c.raw)}원`}}},
+    scales:{x:{ticks:{color:'#888899',font:{size:10}},grid:{color:'rgba(0,0,0,0.05)'}},y1:{position:'left',ticks:{color:'#888899',font:{size:10},callback:v=>fmtWon(v)},grid:{color:'rgba(0,0,0,0.05)'}},y2:{position:'right',ticks:{color:'#1a9e5c',font:{size:10},callback:v=>fmtWon(v)},grid:{display:false}}}}
+  });
+}
+
+// 채널 차트
+function renderChannelChart(){
+  const ms=filterRows(allData.meta).reduce((s,r)=>s+cleanNum(r.spend),0);
+  const ks=filterRows(allData.kakao).reduce((s,r)=>s+cleanNum(r.spend),0);
+  const gs=filterRows(allData.google).reduce((s,r)=>s+cleanNum(r.spend),0);
+  const total=ms+ks+gs;
+  document.getElementById('channel-sub').textContent=filterFrom+' ~ '+filterTo;
+  const ctx=document.getElementById('channel-chart').getContext('2d');
+  if(channelChart)channelChart.destroy();
+  channelChart=new Chart(ctx,{type:'doughnut',data:{labels:['Meta','카카오','구글'],datasets:[{data:[ms,ks,gs],backgroundColor:['rgba(108,99,255,0.8)','rgba(247,151,30,0.8)','rgba(0,198,255,0.8)'],borderColor:['#6c63ff','#f7971e','#00c6ff'],borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:'#555577',font:{size:11},padding:12,boxWidth:12}},tooltip:{backgroundColor:'#ffffff',titleColor:'#1a1a2e',bodyColor:'#555577',borderColor:'#ddd',borderWidth:1,callbacks:{label:c=>` ${fmtWon(c.raw)}원 (${total>0?(c.raw/total*100).toFixed(1):0}%)`}}}}
+  });
+}
+
+// 테이블
+function switchTab(tab){
+  currentTab=tab;
+  const map={meta:'Meta',kakao:'카카오',google:'구글',product:'제품별 매출'};
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.textContent.trim()===map[tab]));
+  if(tab==='product')renderProductTable();else renderCampTable(tab);
+}
+
+function renderCampTable(tab){
+  document.getElementById('camp-date-lbl').textContent=filterFrom===filterTo?`(${filterTo} 기준)`:`(${filterFrom} ~ ${filterTo})`;
+  document.getElementById('main-thead').innerHTML='<tr><th>캠페인</th><th>광고세트</th><th>지출</th><th>ROAS 1d</th><th>구매 1d</th><th>CVR</th><th>CTR</th><th>CPM</th><th>상태</th></tr>';
+  const ydRows=filterRows(allData[tab]);
+  if(!ydRows.length){setEmpty(8,'선택 기간에 데이터 없음');return;}
+  const camps={};
+  ydRows.forEach(r=>{
+    const k=r.campaign_name||'(없음)';
+    if(!camps[k])camps[k]={adsets:new Set(),spend:0,p1d:0,v1d:0,impr:0,clicks:0};
+    camps[k].adsets.add(r.adset_name||'');
+    camps[k].spend+=cleanNum(r.spend);
+    camps[k].p1d+=cleanNum(r.purchases_1d_click||r.purchases||0);
+    camps[k].v1d+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    camps[k].impr+=cleanNum(r.impressions||0);camps[k].clicks+=cleanNum(r.outbound_clicks||0);
+  });
+  document.getElementById('main-tbody').innerHTML=Object.entries(camps).sort((a,b)=>b[1].spend-a[1].spend).map(([n,v])=>{
+    const roas=v.spend>0?v.v1d/v.spend:0;
+    const ctr=v.impr>0?v.clicks/v.impr*100:0;
+    const cpm=v.impr>0?v.spend/v.impr*1000:0;
+    const cvr=v.clicks>0?v.p1d/v.clicks*100:0;
+    const st=roas>=1?'good':roas>=0.5?'warn':'bad';
+    const stTxt=roas>=1?'양호':roas>=0.5?'주의':'위험';
+    const roasColor=roas>=1?'#1a9e5c':roas>=0.5?'#d97706':'#e53935';
+    return`<tr>
+      <td style="max-width:160px;white-space:normal;font-weight:500">${n}</td>
+      <td style="color:var(--text2)">${v.adsets.size}개</td>
+      <td>${fmtWon(v.spend)}원</td>
+      <td style="font-weight:600;color:${roasColor}">${roas.toFixed(2)}x</td>
+      <td>${fmtNum(v.p1d)}건</td>
+      <td>${cvr.toFixed(2)}%</td>
+      <td>${ctr.toFixed(2)}%</td>
+      <td>${fmtWon(cpm)}원</td>
+      <td><span class="badge badge-${st}">${stTxt}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderProductTable(){
+  document.getElementById('camp-date-lbl').textContent='(선택 기간 기준)';
+  document.getElementById('main-thead').innerHTML='<tr><th>제품명</th><th>OY 매출</th><th>실수령액</th><th>공헌이익</th><th>공헌이익률</th><th>판매량</th><th>광고비</th><th>ROAS</th><th>CVR</th><th>광고비/매출</th></tr>';
+  const fOY=filterRows(allData.oy,'partition_date');
+  const fAll=[...filterRows(allData.meta),...filterRows(allData.kakao),...filterRows(allData.google)];
+  const prods={};
+  fOY.forEach(r=>{
+    const k=r.product_name||'(없음)';
+    if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p1d:0,v1d:0,clicks:0,impr:0};
+    prods[k].rev+=cleanNum(r.actual_revenue);
+    prods[k].qty+=cleanNum(r['판매량']||0);
+  });
+  fAll.forEach(r=>{
+    const k=r.product_name||'';
+    if(!k)return;
+    if(!prods[k])prods[k]={rev:0,qty:0,spend:0,p1d:0,v1d:0,clicks:0,impr:0};
+    prods[k].spend+=cleanNum(r.spend);
+    prods[k].p1d+=cleanNum(r.purchases_1d_click||r.purchases||0);
+    prods[k].v1d+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    prods[k].clicks+=cleanNum(r.outbound_clicks||0);
+    prods[k].impr+=cleanNum(r.impressions||0);
+  });
+  if(!Object.keys(prods).length){setEmpty(10,'제품 데이터 없음');return;}
+  document.getElementById('main-tbody').innerHTML=Object.entries(prods).sort((a,b)=>b[1].rev-a[1].rev).map(([n,v])=>{
+    const OY_COM=0.50, COGS=0.20;
+    const netRev   = v.rev*(1-OY_COM);
+    const grossP   = netRev*(1-COGS);
+    const contribP = grossP - v.spend;
+    const contribR = v.rev>0?(contribP/v.rev*100):0;
+    const roas     = v.spend>0?v.v1d/v.spend:0;
+    const ratio    = v.rev>0?v.spend/v.rev*100:0;
+    const cvr      = v.clicks>0?v.p1d/v.clicks*100:0;
+    const contribColor = contribP>=0?'#1a9e5c':'#e53935';
+    const roasColor    = roas>=2?'#1a9e5c':roas>=1?'#d97706':'#e53935';
+    return `<tr>
+      <td style="font-weight:500;max-width:150px;white-space:normal">${n}</td>
+      <td style="color:#1a9e5c;font-weight:600">${fmtWon(v.rev)}원</td>
+      <td style="color:var(--text2)">${v.rev>0?fmtWon(netRev)+'원':'—'}</td>
+      <td style="font-weight:600;color:${contribColor}">${v.rev>0?fmtWon(contribP)+'원':'—'}</td>
+      <td style="color:${contribColor}">${v.rev>0?contribR.toFixed(1)+'%':'—'}</td>
+      <td>${fmtNum(v.qty)}개</td>
+      <td>${v.spend>0?fmtWon(v.spend)+'원':'—'}</td>
+      <td style="font-weight:600;color:${roasColor}">${roas>0?roas.toFixed(2)+'x':'—'}</td>
+      <td>${cvr>0?cvr.toFixed(2)+'%':'—'}</td>
+      <td style="color:${ratio>0&&ratio<30?'#1a9e5c':ratio<60?'#d97706':'#e53935'}">${ratio>0?ratio.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function setEmpty(cols,msg){document.getElementById('main-tbody').innerHTML=`<tr><td colspan="${cols}"><div class="empty-state"><div class="icon">📭</div><p>${msg}</p></div></td></tr>`;}
+
+// ── AI 성과 분석 — Anthropic API 스트리밍 ──────────────────────────
+function buildAnalysisPrompt(){
+  const fM=filterRows(allData.meta);
+  const fK=filterRows(allData.kakao);
+  const fG=filterRows(allData.google);
+  const fOY=filterRows(allData.oy,'partition_date');
+  const p7M=getPrev7(allData.meta);
+  const p7K=getPrev7(allData.kakao);
+  const p7G=getPrev7(allData.google);
+  const p7Days=new Set(p7M.map(r=>normalizeDate(r.partition_date||''))).size||1;
+
+  const agg=(rows,spendKey,valKey,convKey)=>({
+    spend:  rows.reduce((s,r)=>s+cleanNum(r[spendKey]||r.spend||0),0),
+    val:    rows.reduce((s,r)=>s+cleanNum(r[valKey]||r.purchase_value_1d_click||0),0),
+    conv:   rows.reduce((s,r)=>s+cleanNum(r[convKey]||r.purchases_1d_click||0),0),
+    impr:   rows.reduce((s,r)=>s+cleanNum(r.impressions||0),0),
+    click:  rows.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0),
+  });
+
+  const mCur=agg(fM); const kCur=agg(fK); const gCur=agg(fG);
+  const mPre=agg(p7M); const kPre=agg(p7K); const gPre=agg(p7G);
+  const oyRev=fOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const p7OY=getPrev7(allData.oy,'partition_date');
+  const p7OYDays=new Set(p7OY.map(r=>normalizeDate(r.partition_date||''))).size||1;
+  const oyRevPre=p7OY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0)/p7OYDays;
+
+  const totalSpend=mCur.spend+kCur.spend+gCur.spend;
+  const totalVal=mCur.val+kCur.val+gCur.val;
+  const totalRoas=totalSpend>0?(totalVal/totalSpend).toFixed(2):0;
+  const totConv=mCur.conv+kCur.conv+gCur.conv;
+  const totClk=mCur.click+kCur.click+gCur.click;
+
+  // 캠페인별 집계
+  const camps={};
+  [...fM,...fK,...fG].forEach(r=>{
+    const ch=r.channel_name||'';
+    const k=(r.campaign_name||'(없음)');
+    if(!camps[k])camps[k]={spend:0,val:0,conv:0,impr:0,click:0};
+    camps[k].spend+=cleanNum(r.spend);
+    camps[k].val+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    camps[k].conv+=cleanNum(r.purchases_1d_click||r.purchases||0);
+    camps[k].impr+=cleanNum(r.impressions||0);
+    camps[k].click+=cleanNum(r.outbound_clicks||0);
+  });
+  const campLines=Object.entries(camps)
+    .sort((a,b)=>b[1].spend-a[1].spend).slice(0,8)
+    .map(([k,v])=>{
+      const roas=v.spend>0?(v.val/v.spend).toFixed(2):0;
+      const ctr=v.impr>0?(v.click/v.impr*100).toFixed(2):0;
+      return `  • ${k}: 지출 ${fmtWon(v.spend)}만원, ROAS ${roas}x, 구매 ${v.conv}건, CTR ${ctr}%`;
+    }).join('\n');
+
+  const period=filterFrom===filterTo?filterFrom:`${filterFrom} ~ ${filterTo}`;
+  const prod=selectedProduct!=='all'?` [제품: ${selectedProduct}]`:'';
+
+  // 공헌이익 계산
+  const OY_COM = 0.50, COGS = 0.20;
+  const netRev   = oyRev * (1 - OY_COM);
+  const grossP   = netRev * (1 - COGS);
+  const contribP = grossP - totalSpend;
+  const contribR = oyRev > 0 ? (contribP/oyRev*100).toFixed(1) : '-';
+  const cac      = totConv > 0 ? Math.round(totalSpend/totConv) : 0;
+  const cvr      = totClk  > 0 ? (totConv/totClk*100).toFixed(2) : '-';
+
+  // 목표 대비
+  const refYM = filterTo ? filterTo.slice(0,7).replace('-','') : '';
+  const goal  = allData.goals.find(g=>g.yearmonth===refYM&&g.product==='전체')||null;
+  const goalLine = goal
+    ? `\n- 월 목표 매출: ${fmtWon(goal.goalRevenue)}원 (달성률 ${oyRev>0?Math.round(oyRev/goal.goalRevenue*100):0}%), 목표 ROAS: ${goal.goalRoas}x`
+    : '';
+
+  return `당신은 올리브영 입점 뷰티 브랜드의 퍼포먼스 마케팅 전문 분석가입니다.
+
+분석 기간: ${period}${prod}
+※ OY = 올리브영 (수수료 50%, 원가율 20% 적용)
+
+■ 수익성 지표
+- OY 실제 매출: ${fmtWon(oyRev)}원 (직전7일 일평균 ${fmtWon(oyRevPre)}원)
+- 실수령액 (수수료 차감): ${fmtWon(netRev)}원
+- 매출총이익: ${fmtWon(grossP)}원
+- 공헌이익: ${fmtWon(contribP)}원 (공헌이익률 ${contribR}%)${goalLine}
+
+■ 광고 성과
+- 총 광고비: ${fmtWon(totalSpend)}원
+- 광고기여매출(1d): ${fmtWon(totalVal)}원
+- 전체 ROAS: ${totalRoas}x
+- CAC: ${fmtWon(cac)}원/건
+- CVR (클릭→구매): ${cvr}%
+- 광고비/OY매출: ${oyRev>0?(totalSpend/oyRev*100).toFixed(1):'-'}%
+
+■ 매체별 성과
+- Meta: 광고비 ${fmtWon(mCur.spend)}원, ROAS ${mCur.spend>0?(mCur.val/mCur.spend).toFixed(2):0}x, 구매 ${mCur.conv}건
+- 카카오: 광고비 ${fmtWon(kCur.spend)}원, ROAS ${kCur.spend>0?(kCur.val/kCur.spend).toFixed(2):0}x, 구매 ${kCur.conv}건
+- 구글: 광고비 ${fmtWon(gCur.spend)}원, ROAS ${gCur.spend>0?(gCur.val/gCur.spend).toFixed(2):0}x, 구매 ${gCur.conv}건
+
+■ 캠페인별 상세 (광고비 상위)
+${campLines}
+
+아래 형식으로 정확히 응답해주세요:
+
+[요약]
+(수익성 중심으로 3줄 이내 핵심 요약. 공헌이익 흑자/적자 여부 반드시 포함)
+
+[액션]
+HIGH | (제목) | (구체적 실행 방법. 반드시 수치 근거 포함)
+HIGH | (제목) | (구체적 실행 방법. 반드시 수치 근거 포함)
+MID | (제목) | (구체적 실행 방법)
+MID | (제목) | (구체적 실행 방법)
+LOW | (제목) | (구체적 실행 방법)`;
+}
+
+async function runAI(){
+  if(!allData.meta.length){
+    document.getElementById('ai-content').textContent='먼저 데이터를 불러와주세요.';
+    return;
+  }
+  const btn=document.getElementById('ai-btn');
+  const statusEl=document.getElementById('ai-status');
+  const contentEl=document.getElementById('ai-content');
+  const actionEl=document.getElementById('action-list');
+
+  btn.disabled=true; btn.textContent='분석 중...';
+  statusEl.style.display='inline';
+  statusEl.textContent='⏳ Claude가 분석하는 중...';
+  actionEl.innerHTML='';
+
+  // 스켈레톤 로딩
+  contentEl.className='ai-content';
+  contentEl.innerHTML='<div class="ai-skeleton" style="width:90%"></div><div class="ai-skeleton" style="width:75%"></div><div class="ai-skeleton" style="width:82%"></div>';
+
+  const prompt=buildAnalysisPrompt();
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:(()=>{
+        const key=localStorage.getItem('oy_api_key')||'';
+        return {'Content-Type':'application/json','anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true',...(key?{'x-api-key':key}:{})};
+      })(),
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1000,
+        stream:true,
+        system:'당신은 퍼포먼스 마케팅 전문가입니다. 데이터 기반으로 간결하고 실용적인 분석을 제공합니다. 반드시 지정된 형식([요약]/[액션])으로만 응답하세요.',
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+
+    if(!resp.ok){
+      const err=await resp.json().catch(()=>({}));
+      throw new Error(err.error?.message||`API 오류 (${resp.status})`);
+    }
+
+    // 스트리밍 처리
+    const reader=resp.body.getReader();
+    const decoder=new TextDecoder();
+    let fullText='';
+    contentEl.innerHTML='';
+    contentEl.className='ai-content ai-typing';
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      const chunk=decoder.decode(value,{stream:true});
+      const lines=chunk.split('\n');
+      for(const line of lines){
+        if(!line.startsWith('data:'))continue;
+        const data=line.slice(5).trim();
+        if(data==='[DONE]')continue;
+        try{
+          const parsed=JSON.parse(data);
+          if(parsed.type==='content_block_delta'&&parsed.delta?.type==='text_delta'){
+            fullText+=parsed.delta.text;
+            // 실시간 렌더링
+            renderAIResult(fullText, true);
+          }
+        }catch(e){}
+      }
+    }
+
+    // 최종 렌더링
+    contentEl.className='ai-content';
+    renderAIResult(fullText, false);
+    statusEl.textContent='✅ 분석 완료';
+    setTimeout(()=>{statusEl.style.display='none';},3000);
+
+  }catch(e){
+    contentEl.className='ai-content';
+    contentEl.textContent='⚠ 분석 오류: '+e.message+'\n\nAPI 키가 필요해요. 아래 입력창에 Anthropic API 키를 입력해주세요.';
+    const keyWrap=document.createElement('li');
+    keyWrap.style.cssText='padding:10px;list-style:none';
+    const keyInput=document.createElement('input');
+    keyInput.id='api-key-input';
+    keyInput.type='password';
+    keyInput.placeholder='sk-ant-...';
+    keyInput.style.cssText='width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:12px;background:var(--bg3);color:var(--text);outline:none;font-family:monospace';
+    keyInput.addEventListener('input',function(){localStorage.setItem('oy_api_key',this.value);});
+    const keyHint=document.createElement('p');
+    keyHint.style.cssText='font-size:11px;color:var(--text3);margin-top:6px';
+    keyHint.innerHTML='Anthropic API 키를 입력하고 다시 분석 요청 버튼을 눌러주세요. <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent)">콘솔에서 발급 →</a>';
+    keyWrap.appendChild(keyInput);
+    keyWrap.appendChild(keyHint);
+    actionEl.innerHTML='';
+    actionEl.appendChild(keyWrap);
+    const saved=localStorage.getItem('oy_api_key');
+    if(saved)keyInput.value=saved;
+    statusEl.textContent='❌ 오류';
+  }
+  btn.disabled=false; btn.textContent='분석 요청 ↗';
+}
+
+function renderAIResult(text, streaming){
+  const contentEl=document.getElementById('ai-content');
+  const actionEl=document.getElementById('action-list');
+
+  // [요약] 파트 추출
+  const summaryMatch=text.match(/\[요약\]([\s\S]*?)(?=\[액션\]|$)/);
+  const actionMatch=text.match(/\[액션\]([\s\S]*?)$/);
+
+  if(summaryMatch){
+    const summary=summaryMatch[1].trim();
+    contentEl.innerHTML='<div class="ai-summary">'+escapeHtml(summary)+(streaming&&!actionMatch?'<span class="ai-typing-cursor">▋</span>':'')+'</div>';
+  } else {
+    // 아직 [요약] 태그 안 나온 경우 그냥 텍스트로
+    contentEl.textContent=text+(streaming?'▋':'');
+    return;
+  }
+
+  if(actionMatch){
+    const actionText=actionMatch[1].trim();
+    const lines=actionText.split('\n').filter(l=>l.trim());
+    const items=lines.map(line=>{
+      const parts=line.split('|').map(s=>s.trim());
+      if(parts.length>=3){
+        const level=parts[0].toUpperCase();
+        const cls=level==='HIGH'?'action-high':level==='MID'?'action-mid':'action-low';
+        const tag=level==='HIGH'?'🔴 HIGH':level==='MID'?'🟡 MID':'🟢 LOW';
+        return`<li class="action-item ${cls}"><span class="action-tag">${tag}</span><div><strong>${escapeHtml(parts[1])}</strong><br><span style="color:var(--text2)">${escapeHtml(parts[2])}</span></div></li>`;
+      }
+      return line.trim()?`<li class="action-item action-low"><div>${escapeHtml(line)}</div></li>`:'';
+    }).filter(Boolean).join('');
+    actionEl.innerHTML=items+(streaming?'<li style="padding:8px;color:var(--text3);font-size:12px">분석 중...</li>':'');
+  }
+}
+
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function renderAll(){renderKPI();renderGoals();renderExtraKPI();renderTrendChart();renderChannelChart();renderHeatmap();renderBudgetSuggestion();if(currentTab==='product')renderProductTable();else renderCampTable(currentTab);}
+</script>
+</body>
+</html>
+<!-- NEW FEATURES JS -->
+<script>
+// ── 숫자 파싱 (목표값 입력: "2억", "3000만" 등) ─────────────
+// ── 목표 달성률 렌더 (시트 기반, 월별, 제품별) ───────────────
+function getGoal(yearmonth, product){
+  // 시트에서 해당 월 + 제품 목표 찾기
+  const ym = String(yearmonth);
+  const exact = allData.goals.find(g => g.yearmonth===ym && g.product===(product||'전체'));
+  if(exact) return exact;
+  // 제품 없으면 전체 목표
+  return allData.goals.find(g => g.yearmonth===ym && g.product==='전체') || null;
+}
+
+function renderGoals(){
+  const hasData = allData.meta.length>0 || allData.oy.length>0;
+  if(!hasData){
+    document.getElementById('goal-grid').innerHTML =
+      '<div style="font-size:12px;color:var(--text3);padding:8px 0">데이터를 불러오면 달성률이 표시됩니다.</div>';
+    return;
+  }
+
+  // filterTo 기준 월 (선택 기간의 마지막 월)
+  const refDate = filterTo || new Date().toISOString().slice(0,10);
+  const refYM   = refDate.slice(0,7).replace('-',''); // "202504"
+  const monthStart = refDate.slice(0,7) + '-01';
+  const monthEnd   = refDate;
+  const daysInMonth = new Date(+refYM.slice(0,4), +refYM.slice(4,6), 0).getDate();
+
+  // 해당 월 경과 일수 계산
+  const today = new Date().toISOString().slice(0,10);
+  const isCurrentMonth = (refDate.slice(0,7) === today.slice(0,7));
+  const daysPassed = isCurrentMonth
+    ? new Date().getDate()
+    : new Date(+refYM.slice(0,4), +refYM.slice(4,6), 0).getDate(); // 과거 달이면 전체 일수
+
+  // 현재 제품 필터에 맞는 목표 가져오기
+  const goal = getGoal(refYM, selectedProduct==='all' ? '전체' : selectedProduct);
+  const hasGoal = goal && (goal.goalRevenue||goal.goalSpend||goal.goalRoas);
+
+  // 해당 월 실적 집계
+  const mthAds = [...allData.meta,...allData.kakao,...allData.google].filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    const ok = d>=monthStart && d<=monthEnd;
+    return ok && (selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
+  const mthOY = allData.oy.filter(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    const ok = d>=monthStart && d<=monthEnd;
+    return ok && (selectedProduct==='all'||(r.product_name||'')===selectedProduct);
+  });
+
+  const curSpend  = mthAds.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const curRev    = mthOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const curAdVal  = mthAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+  const curRoas   = curSpend>0 ? curAdVal/curSpend : 0;
+
+  // 월말 예측 (일평균 기반)
+  const projRev   = daysPassed>0 ? curRev/daysPassed*daysInMonth : 0;
+  const projSpend = daysPassed>0 ? curSpend/daysPassed*daysInMonth : 0;
+
+  function goalBar(label, cur, goal, proj, unit, isLower){
+    if(!goal) return '';
+    const pct     = Math.min(Math.round(cur/goal*100), 200);
+    const projPct = Math.min(Math.round(proj/goal*100), 200);
+    const color   = isLower
+      ? (pct<=100?'#43e97b':pct<=120?'#f7971e':'#ff6584')
+      : (pct>=100?'#43e97b':pct>=70?'#f7971e':'#ff6584');
+    const fmt = v => unit==='x' ? v.toFixed(2)+'x' : fmtWon(v)+'원';
+    return `<div class="goal-item">
+      <div class="goal-item-label">${label}</div>
+      <div class="goal-bar-wrap">
+        <div class="goal-bar-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div>
+      </div>
+      <div class="goal-nums">
+        <span class="goal-current" style="color:${color}">${fmt(cur)}</span>
+        <span class="goal-target">목표 ${fmt(goal)}</span>
+        <span class="goal-pct" style="color:${color}">${pct}%</span>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:4px">
+        📈 이 추세면 월말 ${fmt(unit==='x'?curRoas:isLower?projSpend:projRev)} 예상 (${projPct}%)
+        ${isCurrentMonth?'':`<span style="color:var(--accent);margin-left:4px">${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월</span>`}
+      </div>
+    </div>`;
+  }
+
+  // 월 레이블 업데이트
+  const lbl = document.getElementById('goal-month-label');
+  if(lbl) lbl.textContent = `${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월 기준 · ${selectedProduct==='all'?'전체 제품':selectedProduct} · 목표 시트 연동`;
+
+  // 목표 없으면 안내 메시지
+  if(!hasGoal){
+    document.getElementById('goal-grid').innerHTML =
+      `<div style="font-size:12px;color:var(--text3);padding:8px 0">
+        📋 ${refYM.slice(0,4)}년 ${refYM.slice(4,6)}월 ${selectedProduct==='all'?'전체':selectedProduct} 목표가 없어요.<br>
+        Google Sheets '목표' 탭에 yearmonth=${refYM} 행을 추가해주세요.
+      </div>`;
+    return;
+  }
+
+  document.getElementById('goal-grid').innerHTML =
+    goalBar(`${refYM.slice(4,6)}월 OY 매출 (${selectedProduct==='all'?'전체':selectedProduct})`,
+      curRev, goal.goalRevenue, projRev, '원', false) +
+    goalBar(`${refYM.slice(4,6)}월 광고비`,
+      curSpend, goal.goalSpend, projSpend, '원', true) +
+    (goal.goalRoas ? goalBar(`${refYM.slice(4,6)}월 ROAS`,
+      curRoas, goal.goalRoas, curRoas, 'x', false) : '');
+}
+
+
+// ── 추가 KPI (CAC, 기여마진율 등) ────────────────────────────
+function renderExtraKPI(){
+  if(!allData.meta.length)return;
+  const grid=document.getElementById('extra-kpi-grid');
+  grid.style.display='grid';
+
+  const fM=filterRows(allData.meta),fK=filterRows(allData.kakao),fG=filterRows(allData.google);
+  const fOY=filterRows(allData.oy,'partition_date');
+
+  const allAds=[...fM,...fK,...fG];
+  const totalSpend=allAds.reduce((s,r)=>s+cleanNum(r.spend),0);
+  const totalConv=allAds.reduce((s,r)=>s+cleanNum(r.purchases_1d_click||r.purchases||0),0);
+  const totalAdVal=allAds.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+  const totalRev=fOY.reduce((s,r)=>s+cleanNum(r.actual_revenue),0);
+  const totalImpr=allAds.reduce((s,r)=>s+cleanNum(r.impressions||0),0);
+  const totalClick=allAds.reduce((s,r)=>s+cleanNum(r.outbound_clicks||0),0);
+
+  const OY_COMMISSION = 0.50; // OY 수수료율 50%
+  const COGS_RATE     = 0.20; // 원가율 20%
+  const cac=totalConv>0?totalSpend/totalConv:0;
+  const revenuePerImpr=totalImpr>0?totalRev/totalImpr*1000:0;
+  const clickToConv=totalClick>0?totalConv/totalClick*100:0;
+
+  // 공헌이익 계산 (OY 수수료 50% + 원가 20% 반영)
+  // 실수령액 = OY매출 × (1 - 수수료율) = OY매출 × 50%
+  const netRevenue    = totalRev * (1 - OY_COMMISSION);      // 수수료 차감 후 실수령액
+  const grossProfit   = netRevenue * (1 - COGS_RATE);        // 매출총이익 = 실수령액 × 80%
+  const contribProfit = grossProfit - totalSpend;             // 공헌이익 = 매출총이익 - 광고비
+  const contribMarginRate = totalRev > 0 ? contribProfit / totalRev * 100 : 0; // 공헌이익률 (OY매출 기준)
+  const adOnlyMargin  = netRevenue > 0 ? (netRevenue - totalSpend) / totalRev * 100 : 0;
+
+  function ekpi(label,val,sub,color,extra){
+    return`<div class="kpi-card" style="--accent-color:${color}">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-value" style="font-size:18px">${val}</div>
+      <div class="kpi-compare">
+        <span style="font-size:10px;color:var(--text3)">${sub}</span>
+        ${extra?`<div style="font-size:10px;color:var(--text3);margin-top:3px">${extra}</div>`:''}
+      </div>
+    </div>`;
+  }
+
+  // 추가 지표
+  const cvr = totalImpr>0 ? totalConv/totalImpr*100 : 0;         // 노출→구매 전환율
+  const clickCvr = totalClick>0 ? totalConv/totalClick*100 : 0;  // 클릭→구매 전환율 (CVR)
+  const cpm = totalImpr>0 ? totalSpend/totalImpr*1000 : 0;
+  const roas7d = totalSpend>0 ? totalAdVal/totalSpend : 0;
+
+  grid.innerHTML=
+    ekpi('공헌이익',
+      totalRev>0 ? fmtWon(contribProfit)+'원' : '—',
+      'OY매출×50%×80% − 광고비',
+      contribProfit>=0?'#43e97b':'#ff6584',
+      totalRev>0?`수수료50%+원가20% 차감 기준`:'')+
+    ekpi('공헌이익률',
+      totalRev>0 ? contribMarginRate.toFixed(1)+'%' : '—',
+      '공헌이익 ÷ OY매출',
+      contribMarginRate>=20?'#43e97b':contribMarginRate>=5?'#f7971e':'#ff6584',
+      totalRev>0?`실수령액 기준 마진: ${(netRevenue>0?(contribProfit/netRevenue*100):0).toFixed(1)}%`:'')+
+    ekpi('실수령액 (수수료 차감)',
+      totalRev>0?fmtWon(netRevenue)+'원':'—',
+      'OY매출 × 50%',
+      '#6c63ff',
+      totalRev>0?`매출총이익: ${fmtWon(grossProfit)}원`:'')+
+    ekpi('CAC (고객획득비용)',
+      cac>0?fmtWon(cac)+'원':'—',
+      '총광고비 ÷ 전환수',
+      '#00c6ff')+
+    ekpi('CVR (클릭→구매)',
+      clickCvr>0?clickCvr.toFixed(2)+'%':'—',
+      '구매수 ÷ 클릭수',
+      '#f7971e',
+      cvr>0?`노출→구매: ${cvr.toFixed(4)}%`:'')+
+    ekpi('노출당 매출',
+      revenuePerImpr>0?fmtWon(revenuePerImpr)+'원':'—',
+      'OY매출 ÷ 1,000노출',
+      '#43e97b')+
+    ekpi('광고기여 매출 (1d)',
+      totalAdVal>0?fmtWon(totalAdVal)+'원':'—',
+      '1d click 전환 매출',
+      '#ff6584',
+      totalRev>0?`OY매출 대비 ${(totalAdVal/totalRev*100).toFixed(1)}%`:'')+
+    ekpi('ROAS (광고기여)',
+      roas7d>0?roas7d.toFixed(2)+'x':'—',
+      '광고기여매출 ÷ 광고비',
+      roas7d>=2?'#43e97b':roas7d>=1?'#f7971e':'#ff6584');
+}
+
+// ── 요일별 히트맵 ─────────────────────────────────────────────
+let heatmapMetric='roas';
+function setHeatmapMetric(m,btn){
+  heatmapMetric=m;
+  document.querySelectorAll('.heatmap-metric-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderHeatmap();
+}
+
+function renderHeatmap(){
+  if(!allData.meta.length)return;
+  document.getElementById('heatmap-card').style.display='block';
+
+  const days=['월','화','수','목','금','토','일'];
+  const all=[...allData.meta,...allData.kakao,...allData.google];
+  // 최근 8주
+  const now=new Date();
+  const cutoff=new Date(now); cutoff.setDate(cutoff.getDate()-56);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+
+  // 주 × 요일 집계
+  const weekMap={};
+  all.forEach(r=>{
+    const d=normalizeDate(r.partition_date||'');
+    if(!d||d<cutoffStr)return;
+    const dt=new Date(d);
+    const dow=(dt.getDay()+6)%7; // 0=월
+    const weekKey=d.slice(0,7)+'-W'+Math.floor(dt.getDate()/7);
+    const k=weekKey+'_'+dow;
+    if(!weekMap[k])weekMap[k]={spend:0,val:0,impr:0,conv:0,week:weekKey,dow};
+    weekMap[k].spend+=cleanNum(r.spend);
+    weekMap[k].val+=cleanNum(r.purchase_value_1d_click||r.purchase_value||0);
+    weekMap[k].impr+=cleanNum(r.impressions||0);
+    weekMap[k].conv+=cleanNum(r.purchases_1d_click||r.purchases||0);
+  });
+
+  // 요일별 평균
+  const dowAgg=Array(7).fill(null).map(()=>({spend:0,val:0,impr:0,conv:0,cnt:0}));
+  Object.values(weekMap).forEach(v=>{
+    dowAgg[v.dow].spend+=v.spend;
+    dowAgg[v.dow].val+=v.val;
+    dowAgg[v.dow].impr+=v.impr;
+    dowAgg[v.dow].conv+=v.conv;
+    dowAgg[v.dow].cnt++;
+  });
+
+  const vals=dowAgg.map(d=>{
+    if(!d.cnt)return 0;
+    if(heatmapMetric==='roas')return d.spend>0?d.val/d.spend:0;
+    if(heatmapMetric==='spend')return d.spend/d.cnt;
+    return d.val/d.cnt;
+  });
+  const maxV=Math.max(...vals,0.001);
+  const minV=Math.min(...vals.filter(v=>v>0),maxV);
+
+  const grid=document.getElementById('heatmap-grid');
+  // 헤더 행
+  let html='<div class="heatmap-label"></div>';
+  days.forEach(d=>{ html+=`<div class="heatmap-day-header">${d}</div>`; });
+  // 지표 행
+  const metricLabel=heatmapMetric==='roas'?'ROAS':heatmapMetric==='spend'?'평균 광고비':'평균 매출';
+  html+=`<div class="heatmap-label" style="font-size:10px">${metricLabel}</div>`;
+  vals.forEach((v,i)=>{
+    const intensity=maxV>0?(v-minV)/(maxV-minV):0;
+    const alpha=0.1+intensity*0.85;
+    const bg=`rgba(108,99,255,${alpha.toFixed(2)})`;
+    const textColor=intensity>0.6?'#fff':'var(--text)';
+    const display=heatmapMetric==='roas'?v.toFixed(2)+'x':fmtWon(v);
+    html+=`<div class="heatmap-cell" style="background:${bg};color:${textColor}" title="${days[i]}: ${display}">${display}</div>`;
+  });
+  grid.innerHTML=html;
+
+  // 인사이트
+  const bestDow=vals.indexOf(Math.max(...vals));
+  const worstDow=vals.indexOf(Math.min(...vals.filter(v=>v>0)));
+  const insight=document.getElementById('heatmap-insight');
+  insight.innerHTML=`
+    <span>🟣 최고 성과 요일: <strong>${days[bestDow]}</strong> (${heatmapMetric==='roas'?vals[bestDow].toFixed(2)+'x':fmtWon(vals[bestDow])})</span>
+    <span>⚪ 최저 성과 요일: <strong>${days[worstDow]}</strong> (${heatmapMetric==='roas'?vals[worstDow].toFixed(2)+'x':fmtWon(vals[worstDow])})</span>
+    <span style="color:var(--text3)">최근 8주 기준 일평균</span>
+  `;
+}
+
+// ── 매체별 예산 배분 제안 ─────────────────────────────────────
+function renderBudgetSuggestion(){
+  if(!allData.meta.length)return;
+  document.getElementById('budget-card').style.display='block';
+
+  // 최근 30일
+  const now=new Date();
+  const cutoff=new Date(now); cutoff.setDate(cutoff.getDate()-30);
+  const cutoffStr=cutoff.toISOString().slice(0,10);
+
+  const channels=[
+    {key:'meta',  name:'Meta',  color:'#6c63ff', rows:allData.meta},
+    {key:'kakao', name:'카카오',color:'#f7971e', rows:allData.kakao},
+    {key:'google',name:'구글',  color:'#00c6ff', rows:allData.google},
+  ];
+
+  const stats=channels.map(ch=>{
+    const rows=ch.rows.filter(r=>normalizeDate(r.partition_date||'')>=cutoffStr);
+    const spend=rows.reduce((s,r)=>s+cleanNum(r.spend),0);
+    const val=rows.reduce((s,r)=>s+cleanNum(r.purchase_value_1d_click||r.purchase_value||0),0);
+    const roas=spend>0?val/spend:0;
+    return{...ch,spend,val,roas};
+  }).filter(c=>c.spend>0);
+
+  if(!stats.length){document.getElementById('budget-card').style.display='none';return;}
+
+  const totalSpend=stats.reduce((s,c)=>s+c.spend,0);
+  // ROAS 기반 최적 배분 (ROAS 가중 소프트맥스)
+  const roasSum=stats.reduce((s,c)=>s+Math.max(c.roas,0.1),0);
+  stats.forEach(c=>{
+    c.curPct=Math.round(c.spend/totalSpend*100);
+    c.optPct=Math.round(Math.max(c.roas,0.1)/roasSum*100);
+  });
+  // 합이 100이 되도록 조정
+  const diff=100-stats.reduce((s,c)=>s+c.optPct,0);
+  if(stats.length)stats[0].optPct+=diff;
+
+  const rows=document.getElementById('budget-rows');
+  rows.innerHTML=stats.map(c=>{
+    const delta=c.optPct-c.curPct;
+    const arrow=delta>2?`<span style="color:#43e97b">▲ +${delta}%p</span>`:delta<-2?`<span style="color:#ff6584">▼ ${delta}%p</span>`:`<span style="color:var(--text3)">→ 유지</span>`;
+    return`<div class="budget-row">
+      <span class="budget-ch">${c.name}</span>
+      <div class="budget-bar-wrap">
+        <div class="budget-bar-cur" style="width:${c.curPct}%;background:${c.color}"></div>
+        <div class="budget-bar-opt" style="width:${c.optPct}%;background:${c.color}"></div>
+      </div>
+      <span class="budget-pcts" style="color:${c.color}">${c.curPct}% → ${c.optPct}%</span>
+      <span class="budget-arrow">${arrow}</span>
+      <span style="font-size:10px;color:var(--text3)">ROAS ${c.roas.toFixed(2)}x</span>
+    </div>`;
+  }).join('');
+
+  const best=stats.reduce((a,b)=>a.roas>b.roas?a:b);
+  const worst=stats.reduce((a,b)=>a.roas<b.roas?a:b);
+  const summary=document.getElementById('budget-summary');
+  summary.innerHTML=`
+    <strong>💡 제안 근거:</strong> 최근 30일 ROAS 기준 <strong>${best.name}</strong>이 ${best.roas.toFixed(2)}x로 가장 효율적이에요.
+    ${worst.roas<1?`<strong>${worst.name}</strong>은 ROAS ${worst.roas.toFixed(2)}x로 광고비 회수가 안 되고 있어 비중 축소를 검토해보세요.`:''}
+    예산 총액 ${fmtWon(totalSpend)}원 유지 시 현재 배분보다 약 <strong>${Math.round((best.roas-stats.reduce((s,c)=>s+c.roas*c.curPct/100,0))*10)/10}x 개선</strong> 가능해요.
+  `;
+}
+
+// ── 초기화 ────────────────────────────────────────────────────
+renderGoals(); // 페이지 로드 시 초기 메시지 표시
+</script>
